@@ -1,0 +1,207 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 像素风字体 */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+@layer base {
+  :root {
+    /* 经典像素游戏深色主题 - 参考星露谷/泰拉瑞亚风格 */
+    --background: 25 25% 12%;
+    --foreground: 35 30% 85%;
+    --card: 25 20% 18%;
+    --card-foreground: 35 30% 85%;
+    --popover: 25 20% 16%;
+    --popover-foreground: 35 30% 85%;
+    --primary: 35 70% 55%;
+    --primary-foreground: 25 25% 10%;
+    --secondary: 25 15% 25%;
+    --secondary-foreground: 35 30% 80%;
+    --muted: 25 15% 22%;
+    --muted-foreground: 35 20% 55%;
+    --accent: 15 60% 50%;
+    --accent-foreground: 35 30% 90%;
+    --destructive: 0 55% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 25% 30%;
+    --input: 25 20% 20%;
+    --ring: 35 70% 55%;
+    --radius: 16px;
+    --chart-1: 35 70% 55%;
+    --chart-2: 140 40% 45%;
+    --chart-3: 200 50% 50%;
+    --chart-4: 280 40% 55%;
+    --chart-5: 0 55% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    line-height: 2;
+  }
+  
+  /* 像素游戏风滚动条 - 深色木质风格 */
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #2a2218;
+    border-radius: 8px;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6b5a48 0%, #5c4a3a 100%);
+    border-radius: 8px;
+    border: 2px solid #2a2218;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #7a6a58 0%, #6b5a48 100%);
+  }
+}
+
+@layer utilities {
+  /* 像素游戏边框 - 木质深色风格 */
+  .pixel-border {
+    border: 3px solid #6b5a48;
+    border-radius: 16px;
+    box-shadow: 
+      3px 3px 0 0 #3d3228,
+      inset 0 0 0 1px rgba(255,255,255,0.08);
+  }
+  
+  /* 像素游戏按钮效果 - 深色木质 */
+  .pixel-btn {
+    border: 3px solid #5c4a3a;
+    border-radius: 12px;
+    box-shadow: 
+      4px 4px 0 0 #2a2218,
+      inset 0 2px 0 0 rgba(255,255,255,0.1);
+    transition: all 0.15s ease;
+  }
+  
+  .pixel-btn:hover {
+    transform: translate(1px, 1px);
+    box-shadow: 
+      3px 3px 0 0 #2a2218,
+      inset 0 2px 0 0 rgba(255,255,255,0.1);
+  }
+  
+  .pixel-btn:active {
+    transform: translate(3px, 3px);
+    box-shadow: 
+      1px 1px 0 0 #2a2218,
+      inset 0 2px 0 0 rgba(255,255,255,0.05);
+  }
+  
+  /* 像素游戏卡片 - 深色木质面板 */
+  .pixel-card {
+    background: linear-gradient(180deg, #2a2218 0%, #1a1612 100%);
+    border: 3px solid #5c4a3a;
+    border-radius: 20px;
+    box-shadow: 
+      6px 6px 0 0 rgba(0, 0, 0, 0.5),
+      inset 0 0 0 2px rgba(255,255,255,0.05);
+  }
+  
+  /* 像素游戏进度条 - 深色 */
+  .pixel-progress {
+    background: #1a1612;
+    border: 3px solid #5c4a3a;
+    border-radius: 10px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+  }
+  
+  /* 品质边框 - 像素游戏风格 */
+  .quality-common {
+    border-color: #7a7a7a;
+    border-radius: 14px;
+    box-shadow: 0 0 0 3px #7a7a7a, 5px 5px 0 0 rgba(0,0,0,0.4);
+  }
+  
+  .quality-rare {
+    border-color: #5a8fc4;
+    border-radius: 14px;
+    box-shadow: 0 0 0 3px #5a8fc4, 5px 5px 0 0 rgba(0,0,0,0.4);
+    animation: pixel-glow-blue 2s ease-in-out infinite;
+  }
+  
+  .quality-legendary {
+    border-color: #d4a840;
+    border-radius: 14px;
+    box-shadow: 0 0 0 3px #d4a840, 5px 5px 0 0 rgba(0,0,0,0.4);
+    animation: pixel-glow-gold 1.5s ease-in-out infinite;
+  }
+  
+  /* 像素游戏文字阴影 */
+  .pixel-text {
+    text-shadow: 
+      2px 2px 0 rgba(0, 0, 0, 0.6);
+  }
+  
+  /* 保留旧类名兼容 - 更新为像素游戏风格 */
+  .cartoon-border {
+    border: 3px solid #6b5a48;
+    border-radius: 16px;
+    box-shadow: 
+      3px 3px 0 0 #3d3228,
+      inset 0 0 0 1px rgba(255,255,255,0.08);
+  }
+  
+  .cartoon-shadow {
+    box-shadow: 5px 5px 0 0 rgba(0, 0, 0, 0.5);
+  }
+}
+
+@keyframes pixel-glow-blue {
+  0%, 100% {
+    box-shadow: 0 0 0 3px #5a8fc4, 5px 5px 0 0 rgba(0,0,0,0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 3px #6a9fd4, 0 0 12px 3px rgba(90, 143, 196, 0.4), 5px 5px 0 0 rgba(0,0,0,0.4);
+  }
+}
+
+@keyframes pixel-glow-gold {
+  0%, 100% {
+    box-shadow: 0 0 0 3px #d4a840, 5px 5px 0 0 rgba(0,0,0,0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 3px #e4b850, 0 0 16px 4px rgba(212, 168, 64, 0.5), 5px 5px 0 0 rgba(0,0,0,0.4);
+  }
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.85) rotate(10deg);
+  }
+}
