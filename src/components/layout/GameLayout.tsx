@@ -7,6 +7,7 @@ import { Orders } from '@/components/game/orders/Orders';
 import { Inventory } from '@/components/game/inventory/Inventory';
 import { Exploration } from '@/components/game/exploration/Exploration';
 import { Upgrades } from '@/components/game/upgrades/Upgrades';
+import { EventModal } from '@/components/game/events';
 
 export function GameLayout() {
   const [currentView, setCurrentView] = useState<GameView>('workshop');
@@ -29,23 +30,27 @@ export function GameLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-forge-cream">
-      {/* Soft dotted background pattern */}
+    <div className="min-h-screen bg-background">
+      {/* Soft pixel texture background */}
       <div 
-        className="fixed inset-0 opacity-30 pointer-events-none"
+        className="fixed inset-0 opacity-20 pointer-events-none"
         style={{
-          backgroundImage: `radial-gradient(circle, #d4a574 1px, transparent 1px)`,
-          backgroundSize: '20px 20px'
+          backgroundImage: `
+            radial-gradient(circle at 50% 50%, #44403c 1px, transparent 1px),
+            linear-gradient(0deg, transparent 23px, #292524 24px)
+          `,
+          backgroundSize: '24px 24px'
         }}
       />
       <Header />
       <Sidebar currentView={currentView} onViewChange={setCurrentView} />
-      <main className="pt-16 pl-20 min-h-screen relative">
-        <div className="p-6">
+      <main className="pt-20 pl-24 min-h-screen relative transition-all duration-300">
+        <div className="p-6 max-w-7xl mx-auto animate-bounce-in">
           {renderView()}
         </div>
       </main>
       <Toaster />
+      <EventModal />
     </div>
   );
 }

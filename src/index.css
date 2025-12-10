@@ -7,27 +7,46 @@
 
 @layer base {
   :root {
-    /* 经典像素游戏深色主题 - 参考星露谷/泰拉瑞亚风格 */
-    --background: 25 25% 12%;
-    --foreground: 35 30% 85%;
-    --card: 25 20% 18%;
-    --card-foreground: 35 30% 85%;
-    --popover: 25 20% 16%;
-    --popover-foreground: 35 30% 85%;
-    --primary: 35 70% 55%;
-    --primary-foreground: 25 25% 10%;
-    --secondary: 25 15% 25%;
-    --secondary-foreground: 35 30% 80%;
-    --muted: 25 15% 22%;
-    --muted-foreground: 35 20% 55%;
-    --accent: 15 60% 50%;
-    --accent-foreground: 35 30% 90%;
-    --destructive: 0 55% 45%;
+    /* 暖石工坊主题 - 中间色调，舒适护眼 */
+    /* 背景：暖石灰 (Warm Stone) - 亮度约 40-45% */
+    --background: 30 15% 42%;
+    /* 前景：柔和米白 (Soft Cream) - 保持高对比度但不刺眼 */
+    --foreground: 36 30% 92%;
+    
+    /* 卡片/面板：较亮的石色 - 亮度约 50-55% */
+    --card: 30 15% 52%;
+    --card-foreground: 36 30% 95%;
+    
+    /* 弹出框 */
+    --popover: 30 15% 48%;
+    --popover-foreground: 36 30% 95%;
+    
+    /* 主色：锻造琥珀 (Amber) */
+    --primary: 35 85% 60%;
+    --primary-foreground: 30 20% 20%;
+    
+    /* 次要：苔藓绿 (Moss) */
+    --secondary: 85 25% 35%;
+    --secondary-foreground: 85 40% 90%;
+    
+    /* 柔和色 */
+    --muted: 30 10% 35%;
+    --muted-foreground: 30 15% 80%;
+    
+    /* 强调色 */
+    --accent: 35 85% 60%;
+    --accent-foreground: 30 20% 20%;
+    
+    /* 破坏/错误：砖红 */
+    --destructive: 10 60% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 30 25% 30%;
-    --input: 25 20% 20%;
-    --ring: 35 70% 55%;
+    
+    /* 边框：深褐岩 (Deep Stone) */
+    --border: 30 15% 25%;
+    --input: 30 15% 35%;
+    --ring: 35 85% 60%;
     --radius: 16px;
+    
     --chart-1: 35 70% 55%;
     --chart-2: 140 40% 45%;
     --chart-3: 200 50% 50%;
@@ -46,78 +65,86 @@
     font-family: 'Press Start 2P', monospace;
     font-size: 10px;
     line-height: 2;
+    /* 添加细微纹理 */
+    background-image: 
+      radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px);
+    background-size: 24px 24px, 100% 4px;
   }
   
-  /* 像素游戏风滚动条 - 深色木质风格 */
+  /* 像素游戏风滚动条 - 石质风格 */
   ::-webkit-scrollbar {
     width: 12px;
     height: 12px;
   }
   
   ::-webkit-scrollbar-track {
-    background: #2a2218;
+    background: #44403c;
     border-radius: 8px;
+    border: 2px solid #292524;
   }
   
   ::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #6b5a48 0%, #5c4a3a 100%);
+    background: linear-gradient(180deg, #78716c 0%, #57534e 100%);
     border-radius: 8px;
-    border: 2px solid #2a2218;
+    border: 2px solid #292524;
   }
   
   ::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, #7a6a58 0%, #6b5a48 100%);
+    background: linear-gradient(180deg, #a8a29e 0%, #78716c 100%);
   }
 }
 
 @layer utilities {
-  /* 像素游戏边框 - 木质深色风格 */
+  /* 像素游戏边框 - 舒适石质风格 */
   .pixel-border {
-    border: 3px solid #6b5a48;
+    border: 3px solid #292524; /* Stone-800 */
     border-radius: 16px;
     box-shadow: 
-      3px 3px 0 0 #3d3228,
-      inset 0 0 0 1px rgba(255,255,255,0.08);
+      3px 3px 0 0 #1c1917, /* Stone-900 */
+      inset 0 1px 0 0 rgba(255,255,255,0.15),
+      inset 0 0 0 1px rgba(255,255,255,0.05);
   }
   
-  /* 像素游戏按钮效果 - 深色木质 */
+  /* 像素游戏按钮效果 - 琥珀/木质 */
   .pixel-btn {
-    border: 3px solid #5c4a3a;
+    border: 3px solid #292524;
     border-radius: 12px;
     box-shadow: 
-      4px 4px 0 0 #2a2218,
-      inset 0 2px 0 0 rgba(255,255,255,0.1);
-    transition: all 0.15s ease;
+      3px 3px 0 0 #1c1917,
+      inset 0 2px 0 0 rgba(255,255,255,0.2);
+    transition: all 0.1s ease;
   }
   
   .pixel-btn:hover {
     transform: translate(1px, 1px);
     box-shadow: 
-      3px 3px 0 0 #2a2218,
-      inset 0 2px 0 0 rgba(255,255,255,0.1);
+      2px 2px 0 0 #1c1917,
+      inset 0 2px 0 0 rgba(255,255,255,0.2);
+    filter: brightness(1.1);
   }
   
   .pixel-btn:active {
     transform: translate(3px, 3px);
     box-shadow: 
-      1px 1px 0 0 #2a2218,
-      inset 0 2px 0 0 rgba(255,255,255,0.05);
+      0 0 0 0 #1c1917,
+      inset 0 2px 0 0 rgba(255,255,255,0.1);
   }
   
-  /* 像素游戏卡片 - 深色木质面板 */
+  /* 像素游戏卡片 - 暖石面板 */
   .pixel-card {
-    background: linear-gradient(180deg, #2a2218 0%, #1a1612 100%);
-    border: 3px solid #5c4a3a;
+    background: linear-gradient(180deg, hsl(30 15% 55%) 0%, hsl(30 15% 50%) 100%);
+    border: 3px solid #292524;
     border-radius: 20px;
     box-shadow: 
-      6px 6px 0 0 rgba(0, 0, 0, 0.5),
-      inset 0 0 0 2px rgba(255,255,255,0.05);
+      5px 5px 0 0 rgba(28, 25, 23, 0.4),
+      inset 0 1px 0 0 rgba(255,255,255,0.15);
   }
   
-  /* 像素游戏进度条 - 深色 */
+  /* 像素游戏进度条 */
   .pixel-progress {
-    background: #1a1612;
-    border: 3px solid #5c4a3a;
+    background: #292524;
+    border: 3px solid #292524;
     border-radius: 10px;
     box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
   }
@@ -204,4 +231,46 @@
     opacity: 0.6;
     transform: scale(0.85) rotate(10deg);
   }
+}
+
+@keyframes card-enter {
+  0% {
+    transform: translateY(100px) rotateX(30deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) rotateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes spin-slow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-card-enter {
+  animation: card-enter 0.5s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
 }

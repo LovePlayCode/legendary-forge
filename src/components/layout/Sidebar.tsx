@@ -21,7 +21,7 @@ const navItems: { id: GameView; icon: React.ElementType; label: string }[] = [
 export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   return (
     <TooltipProvider>
-      <aside className="fixed left-0 top-16 bottom-0 w-20 bg-forge-sand border-r-3 border-forge-brown z-40 flex flex-col items-center py-4 gap-3 shadow-lg">
+      <aside className="fixed left-0 top-16 bottom-0 w-20 bg-muted/30 backdrop-blur border-r-3 border-border z-40 flex flex-col items-center py-6 gap-4 shadow-lg transition-colors duration-300">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;
@@ -34,22 +34,22 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
                   size="icon"
                   onClick={() => onViewChange(item.id)}
                   className={cn(
-                    'w-14 h-14 transition-all duration-150 rounded-xl border-3',
+                    'w-12 h-12 transition-all duration-200 rounded-xl border-2',
                     isActive
-                      ? 'bg-forge-peach border-forge-brown shadow-md'
-                      : 'bg-forge-light border-forge-brown/50 hover:bg-pixel-mint hover:border-forge-brown'
+                      ? 'bg-primary text-primary-foreground border-primary-foreground/30 shadow-md scale-110'
+                      : 'bg-card text-muted-foreground border-transparent hover:bg-muted hover:text-foreground hover:border-border hover:scale-105'
                   )}
                 >
                   <Icon
                     className={cn(
-                      'text-3xl transition-colors',
-                      isActive ? 'text-forge-dark animate-soft-bounce' : 'text-forge-brown'
+                      'text-2xl transition-transform duration-200',
+                      isActive ? 'animate-soft-bounce' : ''
                     )}
                   />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right" className="rounded-xl bg-forge-cream border-2 border-forge-brown shadow-md">
-                <p className="text-xs text-forge-dark">{item.label}</p>
+              <TooltipContent side="right" className="rounded-xl bg-popover text-popover-foreground border-2 border-border shadow-md px-3 py-1.5">
+                <p className="text-xs font-pixel">{item.label}</p>
               </TooltipContent>
             </Tooltip>
           );

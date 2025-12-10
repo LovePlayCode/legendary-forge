@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { GameState, Equipment, Material, Order, Expedition, Quality, MaterialType } from '@/types/game';
+import { GameState, Equipment, Material, Order, Expedition, Quality, MaterialType, EventCard, ActiveEffect, EffectType } from '@/types/game';
 import { initialRecipes } from '@/data/recipes';
 import { initialUpgrades } from '@/data/upgrades';
+import { getRandomCards, EVENT_INTERVAL } from '@/data/events';
 
 interface GameActions {
   addGold: (amount: number) => void;
@@ -21,6 +22,15 @@ interface GameActions {
   purchaseUpgrade: (upgradeId: string) => boolean;
   nextDay: () => void;
   resetGame: () => void;
+  // 事件系统方法
+  triggerEvent: () => void;
+  selectEventCard: (card: EventCard) => void;
+  closeEventModal: () => void;
+  tickEventCooldown: () => void;
+  tickActiveEffects: () => void;
+  consumeEffect: (effectType: EffectType) => ActiveEffect | undefined;
+  getActiveEffect: (effectType: EffectType) => ActiveEffect | undefined;
+  hasActiveEffect: (effectType: EffectType) => boolean;
 }
 
 const initialState: GameState = {
@@ -42,6 +52,11 @@ const initialState: GameState = {
   upgrades: initialUpgrades,
   forgeSpeed: 1,
   qualityBonus: 0,
+  // 事件系统初始状态
+  activeEffects: [],
+  eventCooldown: EVENT_INTERVAL,
+  showEventModal: false,
+  currentEventCards: [],
 };
 
 export const useGameStore = create<GameState & GameActions>()(
@@ -203,6 +218,122 @@ export const useGameStore = create<GameState & GameActions>()(
       nextDay: () => set((state) => ({ day: state.day + 1 })),
 
       resetGame: () => set(initialState),
+
+      // 事件系统方法
+      triggerEvent: () => {
+        const cards = getRandomCards(3);
+        set({
+          showEventModal: true,
+          currentEventCards: cards,
+          eventCooldown: EVENT_INTERVAL,
+        });
+      },
+
+      selectEventCard: (card: EventCard) => {
+        const state = get();
+
+        // 立即生效的效果（如金币奖励）
+        if (card.effectType === 'goldBonus') {
+          set({
+            gold: state.gold + card.effectValue,
+            showEventModal: false,
+            currentEventCards: [],
+          });
+          return;
+        }
+
+        // 创建激活效果
+        const effect: ActiveEffect = {
+          id: `effect-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          cardId: card.id,
+          effectType: card.effectType,
+          effectValue: card.effectValue,
+          remainingTime: card.duration,
+          remainingUsage: card.usageCount,
+          startTime: Date.now(),
+          icon: card.icon,
+          name: card.name,
+        };
+
+        set({
+          activeEffects: [...state.activeEffects, effect],
+          showEventModal: false,
+          currentEventCards: [],
+        });
+      },
+
+      closeEventModal: () => set({
+        showEventModal: false,
+        currentEventCards: [],
+      }),
+
+      tickEventCooldown: () => {
+        const state = get();
+        if (state.showEventModal) return;
+
+        const newCooldown = state.eventCooldown - 1;
+        if (newCooldown <= 0) {
+          get().triggerEvent();
+        } else {
+          set({ eventCooldown: newCooldown });
+        }
+      },
+
+      tickActiveEffects: () => {
+        const state = get();
+        const updatedEffects = state.activeEffects
+          .map((effect) => {
+            if (effect.remainingTime !== undefined) {
+              return { ...effect, remainingTime: effect.remainingTime - 1 };
+            }
+            return effect;
+          })
+          .filter((effect) => {
+            if (effect.remainingTime !== undefined && effect.remainingTime <= 0) {
+              return false;
+            }
+            if (effect.remainingUsage !== undefined && effect.remainingUsage <= 0) {
+              return false;
+            }
+            return true;
+          });
+
+        set({ activeEffects: updatedEffects });
+      },
+
+      consumeEffect: (effectType: EffectType) => {
+        const state = get();
+        const effect = state.activeEffects.find((e) => e.effectType === effectType);
+
+        if (!effect) return undefined;
+
+        if (effect.remainingUsage !== undefined) {
+          const newUsage = effect.remainingUsage - 1;
+          if (newUsage <= 0) {
+            set({
+              activeEffects: state.activeEffects.filter((e) => e.id !== effect.id),
+            });
+          } else {
+            set({
+              activeEffects: state.activeEffects.map((e) =>
+                e.id === effect.id ? { ...e, remainingUsage: newUsage } : e
+              ),
+            });
+          }
+        }
+
+        return effect;
+      },
+
+      getActiveEffect: (effectType: EffectType) => {
+        const state = get();
+        return state.activeEffects.find((e) => e.effectType === effectType);
+      },
+
+      hasActiveEffect: (effectType: EffectType) => {
+        const state = get();
+        return state.activeEffects.some((e) => e.effectType === effectType);
+      },
     }),
     {
       name: 'legendary-forge-save',

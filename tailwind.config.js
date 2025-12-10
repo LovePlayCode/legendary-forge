@@ -41,37 +41,37 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))'
         },
-        // 像素游戏锻造主题色 - 深色暖调
+        // 像素游戏锻造主题色 - 暖石工坊
         forge: {
-          orange: '#d4854a',
-          yellow: '#e8b84a',
-          brown: '#8b6544',
-          cream: '#d4c4a8',
-          dark: '#2a2218',
-          light: '#c4b89c',
-          peach: '#c97850',
-          sand: '#a89880'
+          orange: '#d97706', // 琥珀
+          yellow: '#f59e0b',
+          brown: '#78350f',
+          cream: '#f5f5f4', // 暖白
+          dark: '#1c1917', // 深褐
+          light: '#e7e5e4', // 浅石
+          peach: '#ea580c', // 熔岩
+          sand: '#d6d3d1'   // 石沙
         },
-        // 像素游戏品质色 - 低饱和
+        // 像素游戏品质色 - 稍高饱和以适应中性背景
         quality: {
-          common: '#7a7a7a',
-          rare: '#5a8fc4',
-          legendary: '#d4a840'
+          common: '#78716c',
+          rare: '#3b82f6',
+          legendary: '#f59e0b'
         },
-        // 像素游戏色板 - 深色主题
+        // 像素游戏色板 - 暖石色系
         pixel: {
-          dark: '#1a1612',
-          darker: '#12100c',
-          wood: '#3d3228',
-          woodLight: '#5c4a3a',
-          border: '#6b5a48',
-          shadow: '#0d0b08',
-          copper: '#b87333',
-          gold: '#d4a840',
-          emerald: '#4a8c5c',
-          sapphire: '#4a6c8c',
-          ruby: '#8c4a4a',
-          amethyst: '#6c4a8c'
+          dark: '#292524',
+          darker: '#1c1917',
+          wood: '#57534e', // 实际上是深石色
+          woodLight: '#78716c',
+          border: '#44403c',
+          shadow: '#1c1917',
+          copper: '#b45309',
+          gold: '#f59e0b',
+          emerald: '#15803d',
+          sapphire: '#1d4ed8',
+          ruby: '#b91c1c',
+          amethyst: '#7e22ce'
         },
         chart: {
           '1': 'hsl(var(--chart-1))',

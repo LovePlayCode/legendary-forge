@@ -132,8 +132,8 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
   if (!recipe) {
     return (
       <div className="h-[400px] flex flex-col items-center justify-center text-center">
-        <GiAnvilImpact className="text-8xl text-forge-brown/40 mb-4 animate-soft-pulse" />
-        <p className="text-sm text-forge-brown/60">选择一个配方开始锻造</p>
+        <GiAnvilImpact className="text-8xl text-muted/30 mb-4 animate-soft-pulse" />
+        <p className="text-sm text-muted-foreground">选择一个配方开始锻造</p>
       </div>
     );
   }
@@ -144,22 +144,22 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
       <div className="flex-1 flex items-center justify-center relative">
         <div
           className={cn(
-            'w-32 h-32 rounded-3xl flex items-center justify-center transition-all duration-200 border-3 border-forge-brown shadow-lg',
+            'w-32 h-32 rounded-3xl flex items-center justify-center transition-all duration-200 border-4 shadow-lg',
             isForging ? 'animate-soft-pulse' : '',
             getTempZone() === 'perfect'
-              ? 'bg-pixel-mint'
+              ? 'bg-green-500/20 border-green-500/50'
               : getTempZone() === 'good'
-              ? 'bg-pixel-lemon'
-              : 'bg-pixel-pink'
+              ? 'bg-amber-500/20 border-amber-500/50'
+              : 'bg-red-500/20 border-red-500/50'
           )}
         >
           <GiFireBowl
             className={cn(
               'text-6xl transition-colors',
               getTempZone() === 'perfect'
-                ? 'text-green-600'
+                ? 'text-green-500'
                 : getTempZone() === 'good'
-                ? 'text-amber-600'
+                ? 'text-amber-500'
                 : 'text-red-500'
             )}
           />
@@ -167,17 +167,17 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
 
         {/* QTE Overlay */}
         {qteActive && qteSuccess === null && (
-          <div className="absolute inset-0 bg-forge-dark/60 rounded-2xl flex items-center justify-center">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm rounded-2xl flex items-center justify-center z-10">
             <button
               onClick={handleQteClick}
-              className="w-24 h-24 bg-pixel-lemon rounded-2xl border-3 border-forge-brown shadow-lg flex items-center justify-center hover:bg-forge-yellow transition-colors animate-soft-bounce"
+              className="w-24 h-24 bg-amber-500 rounded-2xl border-b-4 border-amber-700 shadow-lg flex items-center justify-center hover:bg-amber-400 transition-colors animate-soft-bounce"
             >
-              <GiHammerNails className="text-5xl text-forge-dark" />
+              <GiHammerNails className="text-5xl text-amber-950" />
             </button>
             <div className="absolute bottom-4 left-4 right-4">
-              <div className="h-4 bg-forge-sand rounded-lg border-2 border-forge-brown overflow-hidden">
+              <div className="h-4 bg-muted rounded-lg overflow-hidden border border-border">
                 <div 
-                  className="h-full bg-gradient-to-r from-pixel-pink to-forge-orange transition-all duration-50 rounded-md"
+                  className="h-full bg-gradient-to-r from-red-500 to-amber-500 transition-all duration-50 rounded-md"
                   style={{ width: `${qteWindow}%` }}
                 />
               </div>
@@ -187,11 +187,11 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
 
         {/* QTE Result */}
         {qteSuccess !== null && (
-          <div className="absolute inset-0 bg-forge-dark/60 rounded-2xl flex items-center justify-center">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm rounded-2xl flex items-center justify-center z-10">
             <div
               className={cn(
-                'text-sm px-6 py-3 rounded-xl border-3 border-forge-brown animate-bounce-in shadow-lg',
-                qteSuccess ? 'bg-pixel-mint text-green-700' : 'bg-pixel-pink text-red-600'
+                'text-sm px-6 py-3 rounded-xl border-2 animate-bounce-in shadow-lg font-pixel',
+                qteSuccess ? 'bg-green-500/20 border-green-500 text-green-500' : 'bg-red-500/20 border-red-500 text-red-500'
               )}
             >
               {qteSuccess ? '⭐ 完美! ⭐' : '💥 失误... 💥'}
@@ -203,24 +203,24 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
       {/* Temperature Control */}
       <div className="mb-4">
         <div className="flex justify-between mb-2">
-          <span className="text-xs text-forge-dark">炉温控制</span>
+          <span className="text-xs text-muted-foreground">炉温控制</span>
           <span
             className={cn(
-              'text-xs px-3 py-1 rounded-lg border-2 border-forge-brown',
+              'text-xs px-3 py-1 rounded-lg border',
               getTempZone() === 'perfect'
-                ? 'bg-pixel-mint text-green-700'
+                ? 'bg-green-500/10 border-green-500/30 text-green-500'
                 : getTempZone() === 'good'
-                ? 'bg-pixel-lemon text-amber-700'
-                : 'bg-pixel-pink text-red-600'
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
+                : 'bg-red-500/10 border-red-500/30 text-red-500'
             )}
           >
             {Math.round(temperature)}°C
           </span>
         </div>
-        <div className="relative">
+        <div className="relative h-6 flex items-center">
           {/* Target zone indicator */}
           <div
-            className="absolute top-0 h-full bg-pixel-mint/50 rounded-lg"
+            className="absolute top-1 bottom-1 bg-green-500/20 border-l border-r border-green-500/30 z-0 pointer-events-none"
             style={{
               left: `${targetTemp - 10}%`,
               width: '20%',
@@ -232,7 +232,7 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
             max={100}
             step={1}
             disabled={!isForging}
-            className="relative z-10"
+            className="relative z-10 w-full"
           />
         </div>
       </div>
@@ -240,12 +240,12 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
       {/* Progress Bar */}
       <div className="mb-4">
         <div className="flex justify-between mb-2">
-          <span className="text-xs text-forge-dark">锻造进度</span>
-          <span className="text-xs text-forge-orange font-bold">{Math.round(progress)}%</span>
+          <span className="text-xs text-muted-foreground">锻造进度</span>
+          <span className="text-xs text-primary font-bold">{Math.round(progress)}%</span>
         </div>
-        <div className="h-6 bg-forge-sand rounded-xl border-2 border-forge-brown overflow-hidden shadow-inner">
+        <div className="h-4 bg-muted rounded-full overflow-hidden border border-border shadow-inner">
           <div 
-            className="h-full bg-gradient-to-r from-forge-peach to-forge-orange transition-all duration-100 rounded-lg"
+            className="h-full bg-gradient-to-r from-orange-600 to-amber-500 transition-all duration-100"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -256,10 +256,10 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
         onClick={onStartForge}
         disabled={isForging || !canCraft}
         className={cn(
-          'w-full h-14 text-sm rounded-xl border-3 border-forge-brown shadow-md transition-all',
+          'w-full h-14 text-sm rounded-xl border-b-4 shadow-md transition-all active:border-b-0 active:translate-y-1',
           canCraft
-            ? 'bg-forge-peach hover:bg-forge-orange text-forge-dark hover:text-white'
-            : 'bg-forge-sand text-forge-brown/50'
+            ? 'bg-primary border-amber-700 hover:bg-amber-400 text-primary-foreground'
+            : 'bg-muted border-muted-foreground/30 text-muted-foreground'
         )}
       >
         <GiAnvilImpact className="mr-2 text-2xl" />

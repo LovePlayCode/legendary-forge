@@ -91,6 +91,43 @@ export interface Upgrade {
   requires?: string[];
 }
 
+// 随机事件效果类型
+export type EffectType = 
+  | 'doubleForge'      // 锻造翻倍
+  | 'qualityBoost'     // 品质提升
+  | 'materialSave'     // 材料节省
+  | 'goldBonus'        // 金币奖励
+  | 'reputationBoost'  // 声望加成
+  | 'expeditionSpeed'  // 探险加速
+  | 'tempStable'       // 温度稳定
+  | 'qteEasy';         // QTE放宽
+
+export type EventRarity = 'common' | 'rare' | 'epic';
+
+export interface EventCard {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  rarity: EventRarity;
+  effectType: EffectType;
+  effectValue: number;      // 效果数值（如翻倍次数、百分比等）
+  duration?: number;        // 持续时间（秒）
+  usageCount?: number;      // 使用次数
+}
+
+export interface ActiveEffect {
+  id: string;
+  cardId: string;
+  effectType: EffectType;
+  effectValue: number;
+  remainingTime?: number;   // 剩余时间（秒）
+  remainingUsage?: number;  // 剩余使用次数
+  startTime: number;
+  icon: string;
+  name: string;
+}
+
 export interface GameState {
   gold: number;
   reputation: number;
@@ -105,4 +142,9 @@ export interface GameState {
   upgrades: Upgrade[];
   forgeSpeed: number;
   qualityBonus: number;
+  // 随机事件系统
+  activeEffects: ActiveEffect[];
+  eventCooldown: number;        // 下次事件倒计时（秒）
+  showEventModal: boolean;      // 是否显示事件弹窗
+  currentEventCards: EventCard[]; // 当前可选卡片
 }
