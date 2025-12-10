@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GiPointySword, GiBroadsword, GiRoundShield, GiLeatherArmor, GiWizardStaff, GiVisoredHelm, GiTwoCoins, GiDiceSixFacesSix } from 'react-icons/gi';
+import { GiTwoCoins, GiDiceSixFacesSix } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Order, Equipment, Quality } from '@/types/game';
 import { useGameStore } from '@/store/gameStore';
 import { useToast } from '@/hooks/use-toast';
+import { EquipmentIcon } from '@/components/game/common/EquipmentIcon';
 
 interface DeliveryDialogProps {
   open: boolean;
@@ -15,15 +16,6 @@ interface DeliveryDialogProps {
   order: Order | null;
   equipments: Equipment[];
 }
-
-const iconMap: Record<string, React.ElementType> = {
-  GiPointySword,
-  GiBroadsword,
-  GiRoundShield,
-  GiLeatherArmor,
-  GiWizardStaff,
-  GiVisoredHelm,
-};
 
 // 品质边框颜色
 const qualityBorderColors: Record<Quality, string> = {
@@ -183,7 +175,6 @@ export function DeliveryDialog({ open, onClose, order, equipments }: DeliveryDia
               </div>
             ) : (
               equipments.map((item) => {
-                const Icon = iconMap[item.icon] || GiPointySword;
                 const { matches, score } = checkMatch(item);
                 const isSelected = selectedItem?.id === item.id;
 
@@ -206,7 +197,11 @@ export function DeliveryDialog({ open, onClose, order, equipments }: DeliveryDia
                           qualityIconBg[item.quality]
                         )}
                       >
-                        <Icon className="text-2xl text-white" />
+                        <EquipmentIcon
+                          type={item.type}
+                          quality={item.quality}
+                          size={32}
+                        />
                       </div>
                       <div className="flex-1">
                         <p className="text-xs text-forge-dark">{item.name}</p>

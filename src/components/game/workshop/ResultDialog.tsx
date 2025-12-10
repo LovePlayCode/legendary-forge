@@ -1,9 +1,10 @@
-import { GiPointySword, GiBroadsword, GiRoundShield, GiLeatherArmor, GiWizardStaff, GiVisoredHelm, GiSparkles } from 'react-icons/gi';
+import { GiSparkles } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Equipment, Quality } from '@/types/game';
+import { EquipmentIcon } from '@/components/game/common/EquipmentIcon';
 
 interface ResultDialogProps {
   open: boolean;
@@ -11,15 +12,6 @@ interface ResultDialogProps {
   equipment: Equipment | null;
   extraEquipments?: Equipment[];
 }
-
-const iconMap: Record<string, React.ElementType> = {
-  GiPointySword,
-  GiBroadsword,
-  GiRoundShield,
-  GiLeatherArmor,
-  GiWizardStaff,
-  GiVisoredHelm,
-};
 
 // 品质配置
 const qualityColors: Record<Quality, string> = {
@@ -63,8 +55,6 @@ const qualityIconBg: Record<Quality, string> = {
 };
 
 function EquipmentCard({ equipment, compact = false }: { equipment: Equipment; compact?: boolean }) {
-  const Icon = iconMap[equipment.icon] || GiPointySword;
-
   return (
     <div
       className={cn(
@@ -82,7 +72,11 @@ function EquipmentCard({ equipment, compact = false }: { equipment: Equipment; c
             qualityIconBg[equipment.quality]
           )}
         >
-          <Icon className={cn('text-white', compact ? 'text-3xl' : 'text-5xl')} />
+          <EquipmentIcon
+            type={equipment.type}
+            quality={equipment.quality}
+            size={compact ? 40 : 56}
+          />
         </div>
 
         {/* Info */}

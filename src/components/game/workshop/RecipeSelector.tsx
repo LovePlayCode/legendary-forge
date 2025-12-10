@@ -1,10 +1,10 @@
-import { GiPointySword, GiBroadsword, GiRoundShield, GiLeatherArmor, GiWizardStaff, GiVisoredHelm } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
 import { Recipe, MaterialType } from '@/types/game';
 import { useGameStore } from '@/store/gameStore';
 import { materialInfo } from '@/data/materials';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { EquipmentIcon } from '@/components/game/common/EquipmentIcon';
 
 interface RecipeSelectorProps {
   recipes: Recipe[];
@@ -12,15 +12,6 @@ interface RecipeSelectorProps {
   onSelect: (recipe: Recipe) => void;
   disabled?: boolean;
 }
-
-const iconMap: Record<string, React.ElementType> = {
-  GiPointySword,
-  GiBroadsword,
-  GiRoundShield,
-  GiLeatherArmor,
-  GiWizardStaff,
-  GiVisoredHelm,
-};
 
 export function RecipeSelector({ recipes, selectedRecipe, onSelect, disabled }: RecipeSelectorProps) {
   const { getMaterial } = useGameStore();
@@ -45,7 +36,6 @@ export function RecipeSelector({ recipes, selectedRecipe, onSelect, disabled }: 
     <ScrollArea className="h-[400px] pr-4">
       <div className="grid grid-cols-1 gap-3">
         {recipes.map((recipe) => {
-          const Icon = iconMap[recipe.icon] || GiPointySword;
           const craftable = canCraft(recipe);
           const isSelected = selectedRecipe?.id === recipe.id;
 
@@ -73,9 +63,11 @@ export function RecipeSelector({ recipes, selectedRecipe, onSelect, disabled }: 
                     isSelected && 'bg-primary border-primary'
                   )}
                 >
-                  <Icon className={cn('text-3xl transition-colors', 
-                    isSelected ? 'text-primary-foreground' : craftable ? 'text-foreground' : 'text-muted-foreground'
-                  )} />
+                  <EquipmentIcon
+                    type={recipe.resultType}
+                    quality={isSelected ? 'legendary' : 'common'}
+                    size={36}
+                  />
                 </div>
 
                 {/* Info */}

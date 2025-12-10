@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GiKnapsack, GiPointySword, GiBroadsword, GiRoundShield, GiLeatherArmor, GiWizardStaff, GiVisoredHelm, GiMetalBar, GiWoodPile, GiGoldBar, GiBoots, GiGems, GiCrystalBall, GiRock } from 'react-icons/gi';
+import { GiKnapsack, GiMetalBar, GiWoodPile, GiGoldBar, GiBoots, GiGems, GiCrystalBall, GiRock } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,15 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { useGameStore } from '@/store/gameStore';
 import { useToast } from '@/hooks/use-toast';
 import { Equipment, Material, Item, Quality } from '@/types/game';
-
-const equipmentIcons: Record<string, React.ElementType> = {
-  GiPointySword,
-  GiBroadsword,
-  GiRoundShield,
-  GiLeatherArmor,
-  GiWizardStaff,
-  GiVisoredHelm,
-};
+import { EquipmentIcon } from '@/components/game/common/EquipmentIcon';
 
 const materialIcons: Record<string, React.ElementType> = {
   GiIronBar: GiMetalBar,
@@ -39,17 +31,6 @@ const qualityColors: Record<Quality, string> = {
   epic: 'border-purple-500 bg-purple-50',
   legendary: 'border-amber-500 bg-amber-50',
   mythic: 'border-red-500 bg-red-50',
-};
-
-// 品质图标颜色
-const qualityIconColors: Record<Quality, string> = {
-  poor: 'text-gray-500',
-  common: 'text-forge-dark',
-  uncommon: 'text-green-600',
-  rare: 'text-blue-600',
-  epic: 'text-purple-600',
-  legendary: 'text-amber-600',
-  mythic: 'text-red-600',
 };
 
 // 品质文字颜色
@@ -152,7 +133,6 @@ export function Inventory() {
   const renderEquipmentGrid = () => (
     <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-5 p-4 pt-5">
       {equipments.map((item) => {
-        const Icon = equipmentIcons[item.icon] || GiPointySword;
         const isSelected = selectedIds.has(item.id);
 
         return (
@@ -176,10 +156,12 @@ export function Inventory() {
             )}
             {/* Hover 光晕效果 */}
             <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
-            <Icon className={cn(
-              'text-3xl transition-all duration-200 group-hover:scale-110 group-hover:text-primary',
-              isSelected ? 'text-primary' : qualityIconColors[item.quality]
-            )} />
+            <EquipmentIcon
+              type={item.type}
+              quality={item.quality}
+              size={36}
+              className="transition-transform duration-200 group-hover:scale-110"
+            />
             <span className={cn(
               'text-[8px] mt-1 truncate w-full text-center transition-colors duration-200 group-hover:text-primary group-hover:font-bold',
               isSelected ? 'text-primary font-bold' : qualityTextColors[item.quality]
@@ -340,13 +322,18 @@ export function Inventory() {
                     qualityDetailBg[selectedItem.quality]
                   )}
                 >
-                  {(() => {
-                    const Icon =
-                      selectedItem.category === 'equipment'
-                        ? equipmentIcons[(selectedItem as Equipment).icon] || GiPointySword
-                        : materialIcons[(selectedItem as Material).icon] || GiMetalBar;
-                    return <Icon className="text-6xl text-white" />;
-                  })()}
+                  {selectedItem.category === 'equipment' ? (
+                    <EquipmentIcon
+                      type={(selectedItem as Equipment).type}
+                      quality={selectedItem.quality}
+                      size={64}
+                    />
+                  ) : (
+                    (() => {
+                      const Icon = materialIcons[(selectedItem as Material).icon] || GiMetalBar;
+                      return <Icon className="text-6xl text-white" />;
+                    })()
+                  )}
                 </div>
               </div>
 
