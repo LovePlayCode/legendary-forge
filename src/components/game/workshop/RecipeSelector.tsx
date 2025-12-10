@@ -4,7 +4,7 @@ import { useGameStore } from '@/store/gameStore';
 import { materialInfo } from '@/data/materials';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { EquipmentIcon } from '@/components/game/common/EquipmentIcon';
+import { EquipmentIconWrapper } from '@/components/game/common/EquipmentIconWrapper';
 
 interface RecipeSelectorProps {
   recipes: Recipe[];
@@ -63,7 +63,7 @@ export function RecipeSelector({ recipes, selectedRecipe, onSelect, disabled }: 
                     isSelected && 'bg-primary border-primary'
                   )}
                 >
-                  <EquipmentIcon
+                  <EquipmentIconWrapper
                     type={recipe.resultType}
                     quality={isSelected ? 'legendary' : 'common'}
                     size={36}

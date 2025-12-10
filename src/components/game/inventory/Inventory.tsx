@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { useGameStore } from '@/store/gameStore';
 import { useToast } from '@/hooks/use-toast';
 import { Equipment, Material, Item, Quality } from '@/types/game';
-import { EquipmentIcon } from '@/components/game/common/EquipmentIcon';
+import { EquipmentIconWrapper } from '@/components/game/common/EquipmentIconWrapper';
 
 const materialIcons: Record<string, React.ElementType> = {
   GiIronBar: GiMetalBar,
@@ -156,7 +156,7 @@ export function Inventory() {
             )}
             {/* Hover 光晕效果 */}
             <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
-            <EquipmentIcon
+            <EquipmentIconWrapper
               type={item.type}
               quality={item.quality}
               size={36}
@@ -323,7 +323,7 @@ export function Inventory() {
                   )}
                 >
                   {selectedItem.category === 'equipment' ? (
-                    <EquipmentIcon
+                    <EquipmentIconWrapper
                       type={(selectedItem as Equipment).type}
                       quality={selectedItem.quality}
                       size={64}

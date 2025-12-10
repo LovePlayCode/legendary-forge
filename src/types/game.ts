@@ -3,7 +3,60 @@ export type Quality = 'poor' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legend
 
 export type ItemCategory = 'equipment' | 'material' | 'consumable';
 
-export type EquipmentType = 'sword' | 'shield' | 'staff' | 'armor' | 'helmet' | 'boots';
+// 装备类型扩展：
+// 武器类: sword(剑), dagger(匕首), axe(斧), hammer(锤), bow(弓), staff(法杖), spear(长矛)
+// 防具类: shield(盾), armor(护甲), helmet(头盔), boots(靴子), gloves(手套), cloak(披风)
+// 饰品类: ring(戒指), amulet(项链), belt(腰带)
+export type EquipmentType = 
+  // 武器
+  | 'sword' | 'dagger' | 'axe' | 'hammer' | 'bow' | 'staff' | 'spear'
+  // 防具
+  | 'shield' | 'armor' | 'helmet' | 'boots' | 'gloves' | 'cloak'
+  // 饰品
+  | 'ring' | 'amulet' | 'belt';
+
+// 装备分类
+export type EquipmentCategory = 'weapon' | 'armor' | 'accessory';
+
+// 装备类型到分类的映射
+export const equipmentCategoryMap: Record<EquipmentType, EquipmentCategory> = {
+  sword: 'weapon',
+  dagger: 'weapon',
+  axe: 'weapon',
+  hammer: 'weapon',
+  bow: 'weapon',
+  staff: 'weapon',
+  spear: 'weapon',
+  shield: 'armor',
+  armor: 'armor',
+  helmet: 'armor',
+  boots: 'armor',
+  gloves: 'armor',
+  cloak: 'armor',
+  ring: 'accessory',
+  amulet: 'accessory',
+  belt: 'accessory',
+};
+
+// 装备类型中文名
+export const equipmentTypeNames: Record<EquipmentType, string> = {
+  sword: '剑',
+  dagger: '匕首',
+  axe: '战斧',
+  hammer: '战锤',
+  bow: '弓',
+  staff: '法杖',
+  spear: '长矛',
+  shield: '盾牌',
+  armor: '护甲',
+  helmet: '头盔',
+  boots: '靴子',
+  gloves: '手套',
+  cloak: '披风',
+  ring: '戒指',
+  amulet: '项链',
+  belt: '腰带',
+};
 
 export type MaterialType = 'iron' | 'copper' | 'gold' | 'wood' | 'leather' | 'gem' | 'crystal';
 

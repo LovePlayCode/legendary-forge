@@ -4,6 +4,7 @@ import { useGameStore } from '@/store/gameStore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EventTimer, ActiveEffects } from '@/components/game/events';
+import { Icon3DToggle } from '@/components/game/common/EquipmentIconWrapper';
 
 export function Header() {
   const { gold, reputation, level, day } = useGameStore();
@@ -52,6 +53,7 @@ export function Header() {
 
       {/* Settings */}
       <div className="flex items-center gap-3">
+        <Icon3DToggle />
         <Button
           variant="ghost"
           size="icon"

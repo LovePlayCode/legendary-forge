@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Equipment, Quality } from '@/types/game';
-import { EquipmentIcon } from '@/components/game/common/EquipmentIcon';
+import { EquipmentIconWrapper } from '@/components/game/common/EquipmentIconWrapper';
 
 interface ResultDialogProps {
   open: boolean;
@@ -72,7 +72,7 @@ function EquipmentCard({ equipment, compact = false }: { equipment: Equipment; c
             qualityIconBg[equipment.quality]
           )}
         >
-          <EquipmentIcon
+          <EquipmentIconWrapper
             type={equipment.type}
             quality={equipment.quality}
             size={compact ? 40 : 56}

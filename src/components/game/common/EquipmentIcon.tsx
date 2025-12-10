@@ -19,15 +19,17 @@ const qualityColors: Record<Quality, { primary: string; secondary: string; glow:
   mythic: { primary: '#ef4444', secondary: '#dc2626', glow: 'rgba(239,68,68,0.4)' },
 };
 
+type DrawFunction = (ctx: CanvasRenderingContext2D, size: number, colors: { primary: string; secondary: string }) => void;
+
 // 绘制剑
-const drawSword = (ctx: CanvasRenderingContext2D, size: number, colors: { primary: string; secondary: string }) => {
+const drawSword: DrawFunction = (ctx, size, colors) => {
   const cx = size / 2;
   const cy = size / 2;
   const scale = size / 64;
 
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(-Math.PI / 4); // 45度倾斜
+  ctx.rotate(-Math.PI / 4);
 
   // 剑刃
   ctx.beginPath();
@@ -50,14 +52,6 @@ const drawSword = (ctx: CanvasRenderingContext2D, size: number, colors: { primar
   ctx.lineWidth = 1 * scale;
   ctx.stroke();
 
-  // 剑刃中线
-  ctx.beginPath();
-  ctx.moveTo(0, -26 * scale);
-  ctx.lineTo(0, 10 * scale);
-  ctx.strokeStyle = '#d1d5db';
-  ctx.lineWidth = 1.5 * scale;
-  ctx.stroke();
-
   // 护手
   ctx.beginPath();
   ctx.roundRect(-12 * scale, 10 * scale, 24 * scale, 6 * scale, 2 * scale);
@@ -77,30 +71,278 @@ const drawSword = (ctx: CanvasRenderingContext2D, size: number, colors: { primar
   ctx.fillStyle = handleGradient;
   ctx.fill();
 
-  // 剑柄缠绕
-  for (let i = 0; i < 4; i++) {
-    ctx.beginPath();
-    ctx.moveTo(-3 * scale, (18 + i * 3) * scale);
-    ctx.lineTo(3 * scale, (19 + i * 3) * scale);
-    ctx.strokeStyle = '#451a03';
-    ctx.lineWidth = 0.8 * scale;
-    ctx.stroke();
-  }
-
   // 剑首
   ctx.beginPath();
   ctx.arc(0, 32 * scale, 4 * scale, 0, Math.PI * 2);
   ctx.fillStyle = colors.primary;
   ctx.fill();
-  ctx.strokeStyle = colors.secondary;
+
+  ctx.restore();
+};
+
+// 绘制匕首
+const drawDagger: DrawFunction = (ctx, size, colors) => {
+  const cx = size / 2;
+  const cy = size / 2;
+  const scale = size / 64;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-Math.PI / 4);
+
+  // 短刃
+  ctx.beginPath();
+  ctx.moveTo(0, -24 * scale);
+  ctx.lineTo(5 * scale, -8 * scale);
+  ctx.lineTo(4 * scale, 6 * scale);
+  ctx.lineTo(0, 10 * scale);
+  ctx.lineTo(-4 * scale, 6 * scale);
+  ctx.lineTo(-5 * scale, -8 * scale);
+  ctx.closePath();
+
+  const bladeGradient = ctx.createLinearGradient(-5 * scale, 0, 5 * scale, 0);
+  bladeGradient.addColorStop(0, '#d1d5db');
+  bladeGradient.addColorStop(0.5, '#ffffff');
+  bladeGradient.addColorStop(1, '#d1d5db');
+  ctx.fillStyle = bladeGradient;
+  ctx.fill();
+  ctx.strokeStyle = '#9ca3af';
   ctx.lineWidth = 1 * scale;
   ctx.stroke();
+
+  // 护手
+  ctx.beginPath();
+  ctx.roundRect(-8 * scale, 8 * scale, 16 * scale, 4 * scale, 1 * scale);
+  ctx.fillStyle = colors.primary;
+  ctx.fill();
+
+  // 柄
+  ctx.beginPath();
+  ctx.roundRect(-2.5 * scale, 12 * scale, 5 * scale, 12 * scale, 1 * scale);
+  ctx.fillStyle = '#8b4513';
+  ctx.fill();
+
+  // 柄首
+  ctx.beginPath();
+  ctx.arc(0, 26 * scale, 3 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = colors.secondary;
+  ctx.fill();
+
+  ctx.restore();
+};
+
+// 绘制战斧
+const drawAxe: DrawFunction = (ctx, size, colors) => {
+  const cx = size / 2;
+  const cy = size / 2;
+  const scale = size / 64;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-Math.PI / 6);
+
+  // 斧柄
+  ctx.beginPath();
+  ctx.roundRect(-3 * scale, -20 * scale, 6 * scale, 48 * scale, 2 * scale);
+  ctx.fillStyle = '#8b4513';
+  ctx.fill();
+
+  // 斧刃
+  ctx.beginPath();
+  ctx.moveTo(3 * scale, -16 * scale);
+  ctx.quadraticCurveTo(22 * scale, -12 * scale, 20 * scale, 0);
+  ctx.quadraticCurveTo(18 * scale, 12 * scale, 3 * scale, 8 * scale);
+  ctx.closePath();
+
+  const axeGradient = ctx.createLinearGradient(3 * scale, 0, 20 * scale, 0);
+  axeGradient.addColorStop(0, '#a0a0a0');
+  axeGradient.addColorStop(0.5, '#e0e0e0');
+  axeGradient.addColorStop(1, '#c0c0c0');
+  ctx.fillStyle = axeGradient;
+  ctx.fill();
+  ctx.strokeStyle = '#808080';
+  ctx.lineWidth = 1 * scale;
+  ctx.stroke();
+
+  // 装饰环
+  ctx.beginPath();
+  ctx.roundRect(-5 * scale, -4 * scale, 10 * scale, 3 * scale, 1 * scale);
+  ctx.fillStyle = colors.primary;
+  ctx.fill();
+
+  ctx.restore();
+};
+
+// 绘制战锤
+const drawHammer: DrawFunction = (ctx, size, colors) => {
+  const cx = size / 2;
+  const cy = size / 2;
+  const scale = size / 64;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-Math.PI / 6);
+
+  // 锤柄
+  ctx.beginPath();
+  ctx.roundRect(-3 * scale, -8 * scale, 6 * scale, 40 * scale, 2 * scale);
+  ctx.fillStyle = '#8b4513';
+  ctx.fill();
+
+  // 锤头
+  ctx.beginPath();
+  ctx.roundRect(-14 * scale, -24 * scale, 28 * scale, 18 * scale, 3 * scale);
+  const hammerGradient = ctx.createLinearGradient(-14 * scale, -24 * scale, 14 * scale, -6 * scale);
+  hammerGradient.addColorStop(0, '#808080');
+  hammerGradient.addColorStop(0.5, '#c0c0c0');
+  hammerGradient.addColorStop(1, '#a0a0a0');
+  ctx.fillStyle = hammerGradient;
+  ctx.fill();
+  ctx.strokeStyle = '#606060';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
+
+  // 装饰带
+  ctx.beginPath();
+  ctx.roundRect(-16 * scale, -16 * scale, 32 * scale, 4 * scale, 1 * scale);
+  ctx.fillStyle = colors.primary;
+  ctx.fill();
+
+  ctx.restore();
+};
+
+// 绘制弓
+const drawBow: DrawFunction = (ctx, size, colors) => {
+  const cx = size / 2;
+  const cy = size / 2;
+  const scale = size / 64;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // 弓身
+  ctx.beginPath();
+  ctx.moveTo(-8 * scale, -26 * scale);
+  ctx.quadraticCurveTo(-24 * scale, 0, -8 * scale, 26 * scale);
+  ctx.strokeStyle = '#8b4513';
+  ctx.lineWidth = 4 * scale;
+  ctx.stroke();
+
+  // 弓弦
+  ctx.beginPath();
+  ctx.moveTo(-8 * scale, -26 * scale);
+  ctx.lineTo(-8 * scale, 26 * scale);
+  ctx.strokeStyle = '#d4d4d4';
+  ctx.lineWidth = 1 * scale;
+  ctx.stroke();
+
+  // 握把
+  ctx.beginPath();
+  ctx.roundRect(-12 * scale, -6 * scale, 8 * scale, 12 * scale, 2 * scale);
+  ctx.fillStyle = colors.primary;
+  ctx.fill();
+
+  // 弓尖装饰
+  ctx.beginPath();
+  ctx.arc(-8 * scale, -26 * scale, 3 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = colors.secondary;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(-8 * scale, 26 * scale, 3 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = colors.secondary;
+  ctx.fill();
+
+  ctx.restore();
+};
+
+// 绘制法杖
+const drawStaff: DrawFunction = (ctx, size, colors) => {
+  const cx = size / 2;
+  const cy = size / 2;
+  const scale = size / 64;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-Math.PI / 6);
+
+  // 法杖杆
+  ctx.beginPath();
+  ctx.roundRect(-3 * scale, -12 * scale, 6 * scale, 42 * scale, 2 * scale);
+  const staffGradient = ctx.createLinearGradient(-3 * scale, 0, 3 * scale, 0);
+  staffGradient.addColorStop(0, '#713f12');
+  staffGradient.addColorStop(0.5, '#a16207');
+  staffGradient.addColorStop(1, '#713f12');
+  ctx.fillStyle = staffGradient;
+  ctx.fill();
+
+  // 法杖头部装饰
+  ctx.beginPath();
+  ctx.moveTo(-8 * scale, -12 * scale);
+  ctx.quadraticCurveTo(-12 * scale, -22 * scale, 0, -28 * scale);
+  ctx.quadraticCurveTo(12 * scale, -22 * scale, 8 * scale, -12 * scale);
+  ctx.closePath();
+  ctx.fillStyle = colors.secondary;
+  ctx.fill();
+
+  // 魔法宝珠
+  ctx.beginPath();
+  ctx.arc(0, -20 * scale, 7 * scale, 0, Math.PI * 2);
+  const orbGradient = ctx.createRadialGradient(-2 * scale, -22 * scale, 0, 0, -20 * scale, 7 * scale);
+  orbGradient.addColorStop(0, '#ffffff');
+  orbGradient.addColorStop(0.3, colors.primary);
+  orbGradient.addColorStop(1, colors.secondary);
+  ctx.fillStyle = orbGradient;
+  ctx.fill();
+
+  ctx.restore();
+};
+
+// 绘制长矛
+const drawSpear: DrawFunction = (ctx, size, colors) => {
+  const cx = size / 2;
+  const cy = size / 2;
+  const scale = size / 64;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-Math.PI / 6);
+
+  // 矛杆
+  ctx.beginPath();
+  ctx.roundRect(-2.5 * scale, -16 * scale, 5 * scale, 48 * scale, 1 * scale);
+  ctx.fillStyle = '#8b4513';
+  ctx.fill();
+
+  // 矛尖
+  ctx.beginPath();
+  ctx.moveTo(0, -32 * scale);
+  ctx.lineTo(6 * scale, -16 * scale);
+  ctx.lineTo(0, -12 * scale);
+  ctx.lineTo(-6 * scale, -16 * scale);
+  ctx.closePath();
+
+  const tipGradient = ctx.createLinearGradient(-6 * scale, -24 * scale, 6 * scale, -24 * scale);
+  tipGradient.addColorStop(0, '#a0a0a0');
+  tipGradient.addColorStop(0.5, '#e0e0e0');
+  tipGradient.addColorStop(1, '#a0a0a0');
+  ctx.fillStyle = tipGradient;
+  ctx.fill();
+  ctx.strokeStyle = '#808080';
+  ctx.lineWidth = 1 * scale;
+  ctx.stroke();
+
+  // 装饰环
+  ctx.beginPath();
+  ctx.roundRect(-4 * scale, -18 * scale, 8 * scale, 3 * scale, 1 * scale);
+  ctx.fillStyle = colors.primary;
+  ctx.fill();
 
   ctx.restore();
 };
 
 // 绘制盾牌
-const drawShield = (ctx: CanvasRenderingContext2D, size: number, colors: { primary: string; secondary: string }) => {
+const drawShield: DrawFunction = (ctx, size, colors) => {
   const cx = size / 2;
   const cy = size / 2;
   const scale = size / 64;
@@ -126,106 +368,21 @@ const drawShield = (ctx: CanvasRenderingContext2D, size: number, colors: { prima
   ctx.lineWidth = 2 * scale;
   ctx.stroke();
 
-  // 盾牌边框装饰
-  ctx.beginPath();
-  ctx.moveTo(0, -20 * scale);
-  ctx.bezierCurveTo(16 * scale, -20 * scale, 18 * scale, -6 * scale, 18 * scale, 4 * scale);
-  ctx.bezierCurveTo(18 * scale, 14 * scale, 10 * scale, 22 * scale, 0, 24 * scale);
-  ctx.bezierCurveTo(-10 * scale, 22 * scale, -18 * scale, 14 * scale, -18 * scale, 4 * scale);
-  ctx.bezierCurveTo(-18 * scale, -6 * scale, -16 * scale, -20 * scale, 0, -20 * scale);
-  ctx.closePath();
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 2 * scale;
-  ctx.stroke();
-
-  // 中心装饰
-  ctx.beginPath();
-  ctx.arc(0, 2 * scale, 8 * scale, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.2)';
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-  ctx.lineWidth = 1.5 * scale;
-  ctx.stroke();
-
   // 中心宝石
   ctx.beginPath();
-  ctx.arc(0, 2 * scale, 4 * scale, 0, Math.PI * 2);
-  const gemGradient = ctx.createRadialGradient(-1 * scale, 0, 0, 0, 2 * scale, 4 * scale);
+  ctx.arc(0, 2 * scale, 6 * scale, 0, Math.PI * 2);
+  const gemGradient = ctx.createRadialGradient(-1 * scale, 0, 0, 0, 2 * scale, 6 * scale);
   gemGradient.addColorStop(0, '#ffffff');
-  gemGradient.addColorStop(0.3, colors.primary);
-  gemGradient.addColorStop(1, colors.secondary);
+  gemGradient.addColorStop(0.5, '#ffd700');
+  gemGradient.addColorStop(1, '#b8860b');
   ctx.fillStyle = gemGradient;
   ctx.fill();
 
   ctx.restore();
 };
 
-// 绘制法杖
-const drawStaff = (ctx: CanvasRenderingContext2D, size: number, colors: { primary: string; secondary: string }) => {
-  const cx = size / 2;
-  const cy = size / 2;
-  const scale = size / 64;
-
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(-Math.PI / 6);
-
-  // 法杖杆
-  ctx.beginPath();
-  ctx.roundRect(-3 * scale, -12 * scale, 6 * scale, 42 * scale, 2 * scale);
-  const staffGradient = ctx.createLinearGradient(-3 * scale, 0, 3 * scale, 0);
-  staffGradient.addColorStop(0, '#713f12');
-  staffGradient.addColorStop(0.3, '#a16207');
-  staffGradient.addColorStop(0.7, '#854d0e');
-  staffGradient.addColorStop(1, '#422006');
-  ctx.fillStyle = staffGradient;
-  ctx.fill();
-
-  // 法杖头部装饰
-  ctx.beginPath();
-  ctx.moveTo(-8 * scale, -12 * scale);
-  ctx.quadraticCurveTo(-12 * scale, -22 * scale, 0, -28 * scale);
-  ctx.quadraticCurveTo(12 * scale, -22 * scale, 8 * scale, -12 * scale);
-  ctx.closePath();
-  ctx.fillStyle = colors.secondary;
-  ctx.fill();
-  ctx.strokeStyle = colors.primary;
-  ctx.lineWidth = 1.5 * scale;
-  ctx.stroke();
-
-  // 魔法宝珠
-  ctx.beginPath();
-  ctx.arc(0, -20 * scale, 7 * scale, 0, Math.PI * 2);
-  const orbGradient = ctx.createRadialGradient(-2 * scale, -22 * scale, 0, 0, -20 * scale, 7 * scale);
-  orbGradient.addColorStop(0, '#ffffff');
-  orbGradient.addColorStop(0.3, colors.primary);
-  orbGradient.addColorStop(0.7, colors.secondary);
-  orbGradient.addColorStop(1, colors.secondary);
-  ctx.fillStyle = orbGradient;
-  ctx.fill();
-
-  // 宝珠高光
-  ctx.beginPath();
-  ctx.arc(-2 * scale, -22 * scale, 2 * scale, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.8)';
-  ctx.fill();
-
-  // 装饰环
-  ctx.beginPath();
-  ctx.roundRect(-5 * scale, -14 * scale, 10 * scale, 3 * scale, 1 * scale);
-  ctx.fillStyle = colors.primary;
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.roundRect(-4 * scale, 0, 8 * scale, 2 * scale, 1 * scale);
-  ctx.fillStyle = colors.primary;
-  ctx.fill();
-
-  ctx.restore();
-};
-
 // 绘制护甲
-const drawArmor = (ctx: CanvasRenderingContext2D, size: number, colors: { primary: string; secondary: string }) => {
+const drawArmor: DrawFunction = (ctx, size, colors) => {
   const cx = size / 2;
   const cy = size / 2;
   const scale = size / 64;
@@ -251,19 +408,10 @@ const drawArmor = (ctx: CanvasRenderingContext2D, size: number, colors: { primar
 
   const armorGradient = ctx.createLinearGradient(-20 * scale, 0, 20 * scale, 0);
   armorGradient.addColorStop(0, colors.secondary);
-  armorGradient.addColorStop(0.3, colors.primary);
   armorGradient.addColorStop(0.5, colors.primary);
-  armorGradient.addColorStop(0.7, colors.primary);
   armorGradient.addColorStop(1, colors.secondary);
   ctx.fillStyle = armorGradient;
   ctx.fill();
-  ctx.strokeStyle = colors.secondary;
-  ctx.lineWidth = 2 * scale;
-  ctx.stroke();
-
-  // 领口
-  ctx.beginPath();
-  ctx.arc(0, -18 * scale, 8 * scale, 0, Math.PI, true);
   ctx.strokeStyle = colors.secondary;
   ctx.lineWidth = 2 * scale;
   ctx.stroke();
@@ -276,34 +424,11 @@ const drawArmor = (ctx: CanvasRenderingContext2D, size: number, colors: { primar
   ctx.lineWidth = 2 * scale;
   ctx.stroke();
 
-  // 横线装饰
-  ctx.beginPath();
-  ctx.moveTo(-12 * scale, 0);
-  ctx.lineTo(12 * scale, 0);
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  ctx.lineWidth = 1.5 * scale;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(-10 * scale, 10 * scale);
-  ctx.lineTo(10 * scale, 10 * scale);
-  ctx.stroke();
-
-  // 肩甲装饰
-  ctx.beginPath();
-  ctx.arc(-16 * scale, -12 * scale, 4 * scale, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.2)';
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.arc(16 * scale, -12 * scale, 4 * scale, 0, Math.PI * 2);
-  ctx.fill();
-
   ctx.restore();
 };
 
 // 绘制头盔
-const drawHelmet = (ctx: CanvasRenderingContext2D, size: number, colors: { primary: string; secondary: string }) => {
+const drawHelmet: DrawFunction = (ctx, size, colors) => {
   const cx = size / 2;
   const cy = size / 2;
   const scale = size / 64;
@@ -323,8 +448,7 @@ const drawHelmet = (ctx: CanvasRenderingContext2D, size: number, colors: { prima
 
   const helmetGradient = ctx.createLinearGradient(-20 * scale, 0, 20 * scale, 0);
   helmetGradient.addColorStop(0, colors.secondary);
-  helmetGradient.addColorStop(0.4, colors.primary);
-  helmetGradient.addColorStop(0.6, colors.primary);
+  helmetGradient.addColorStop(0.5, colors.primary);
   helmetGradient.addColorStop(1, colors.secondary);
   ctx.fillStyle = helmetGradient;
   ctx.fill();
@@ -334,55 +458,36 @@ const drawHelmet = (ctx: CanvasRenderingContext2D, size: number, colors: { prima
 
   // 面罩开口
   ctx.beginPath();
-  ctx.moveTo(-10 * scale, 4 * scale);
-  ctx.lineTo(-10 * scale, 16 * scale);
-  ctx.lineTo(10 * scale, 16 * scale);
-  ctx.lineTo(10 * scale, 4 * scale);
-  ctx.quadraticCurveTo(0, -2 * scale, -10 * scale, 4 * scale);
-  ctx.closePath();
+  ctx.roundRect(-10 * scale, 2 * scale, 20 * scale, 14 * scale, 2 * scale);
   ctx.fillStyle = '#1f2937';
   ctx.fill();
 
   // 面罩横条
   for (let i = 0; i < 3; i++) {
     ctx.beginPath();
-    ctx.moveTo(-10 * scale, (6 + i * 4) * scale);
-    ctx.lineTo(10 * scale, (6 + i * 4) * scale);
+    ctx.moveTo(-10 * scale, (5 + i * 4) * scale);
+    ctx.lineTo(10 * scale, (5 + i * 4) * scale);
     ctx.strokeStyle = colors.secondary;
     ctx.lineWidth = 1.5 * scale;
     ctx.stroke();
   }
 
-  // 头盔顶部装饰
-  ctx.beginPath();
-  ctx.moveTo(0, -24 * scale);
-  ctx.lineTo(0, -30 * scale);
-  ctx.lineTo(4 * scale, -26 * scale);
-  ctx.lineTo(0, -24 * scale);
-  ctx.fillStyle = colors.primary;
-  ctx.fill();
-
-  // 侧面装饰
-  ctx.beginPath();
-  ctx.arc(-14 * scale, -4 * scale, 3 * scale, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.arc(14 * scale, -4 * scale, 3 * scale, 0, Math.PI * 2);
-  ctx.fill();
-
   ctx.restore();
 };
 
 // 绘制靴子
-const drawBoots = (ctx: CanvasRenderingContext2D, size: number, colors: { primary: string; secondary: string }) => {
+const drawBoots: DrawFunction = (ctx, size, colors) => {
   const cx = size / 2;
   const cy = size / 2;
   const scale = size / 64;
 
   ctx.save();
   ctx.translate(cx, cy);
+
+  const bootGradient = ctx.createLinearGradient(-22 * scale, 0, 22 * scale, 0);
+  bootGradient.addColorStop(0, colors.secondary);
+  bootGradient.addColorStop(0.5, colors.primary);
+  bootGradient.addColorStop(1, colors.secondary);
 
   // 左靴
   ctx.beginPath();
@@ -394,28 +499,10 @@ const drawBoots = (ctx: CanvasRenderingContext2D, size: number, colors: { primar
   ctx.lineTo(-22 * scale, 10 * scale);
   ctx.lineTo(-20 * scale, 8 * scale);
   ctx.closePath();
-
-  const bootGradient = ctx.createLinearGradient(-22 * scale, 0, -4 * scale, 0);
-  bootGradient.addColorStop(0, colors.secondary);
-  bootGradient.addColorStop(0.5, colors.primary);
-  bootGradient.addColorStop(1, colors.secondary);
   ctx.fillStyle = bootGradient;
   ctx.fill();
   ctx.strokeStyle = colors.secondary;
   ctx.lineWidth = 1.5 * scale;
-  ctx.stroke();
-
-  // 左靴装饰
-  ctx.beginPath();
-  ctx.moveTo(-18 * scale, -12 * scale);
-  ctx.lineTo(-8 * scale, -12 * scale);
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 1 * scale;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(-18 * scale, -4 * scale);
-  ctx.lineTo(-8 * scale, -4 * scale);
   ctx.stroke();
 
   // 右靴
@@ -428,28 +515,10 @@ const drawBoots = (ctx: CanvasRenderingContext2D, size: number, colors: { primar
   ctx.lineTo(4 * scale, 16 * scale);
   ctx.lineTo(6 * scale, 8 * scale);
   ctx.closePath();
-
-  const bootGradient2 = ctx.createLinearGradient(4 * scale, 0, 22 * scale, 0);
-  bootGradient2.addColorStop(0, colors.secondary);
-  bootGradient2.addColorStop(0.5, colors.primary);
-  bootGradient2.addColorStop(1, colors.secondary);
-  ctx.fillStyle = bootGradient2;
+  ctx.fillStyle = bootGradient;
   ctx.fill();
   ctx.strokeStyle = colors.secondary;
   ctx.lineWidth = 1.5 * scale;
-  ctx.stroke();
-
-  // 右靴装饰
-  ctx.beginPath();
-  ctx.moveTo(8 * scale, -12 * scale);
-  ctx.lineTo(18 * scale, -12 * scale);
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 1 * scale;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(8 * scale, -4 * scale);
-  ctx.lineTo(18 * scale, -4 * scale);
   ctx.stroke();
 
   // 靴口装饰
@@ -465,14 +534,281 @@ const drawBoots = (ctx: CanvasRenderingContext2D, size: number, colors: { primar
   ctx.restore();
 };
 
+// 绘制手套
+const drawGloves: DrawFunction = (ctx, size, colors) => {
+  const cx = size / 2;
+  const cy = size / 2;
+  const scale = size / 64;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  const gloveGradient = ctx.createLinearGradient(-24 * scale, 0, 24 * scale, 0);
+  gloveGradient.addColorStop(0, colors.secondary);
+  gloveGradient.addColorStop(0.5, colors.primary);
+  gloveGradient.addColorStop(1, colors.secondary);
+
+  // 左手套
+  ctx.beginPath();
+  ctx.roundRect(-24 * scale, -8 * scale, 18 * scale, 20 * scale, 3 * scale);
+  ctx.fillStyle = gloveGradient;
+  ctx.fill();
+  ctx.strokeStyle = colors.secondary;
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
+
+  // 左手指
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.roundRect((-22 + i * 4) * scale, -16 * scale, 3 * scale, 10 * scale, 1 * scale);
+    ctx.fillStyle = gloveGradient;
+    ctx.fill();
+  }
+
+  // 右手套
+  ctx.beginPath();
+  ctx.roundRect(6 * scale, -8 * scale, 18 * scale, 20 * scale, 3 * scale);
+  ctx.fillStyle = gloveGradient;
+  ctx.fill();
+  ctx.strokeStyle = colors.secondary;
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
+
+  // 右手指
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.roundRect((8 + i * 4) * scale, -16 * scale, 3 * scale, 10 * scale, 1 * scale);
+    ctx.fillStyle = gloveGradient;
+    ctx.fill();
+  }
+
+  // 护腕装饰
+  ctx.beginPath();
+  ctx.roundRect(-25 * scale, 8 * scale, 20 * scale, 4 * scale, 1 * scale);
+  ctx.fillStyle = colors.secondary;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.roundRect(5 * scale, 8 * scale, 20 * scale, 4 * scale, 1 * scale);
+  ctx.fill();
+
+  ctx.restore();
+};
+
+// 绘制披风
+const drawCloak: DrawFunction = (ctx, size, colors) => {
+  const cx = size / 2;
+  const cy = size / 2;
+  const scale = size / 64;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // 披风主体
+  ctx.beginPath();
+  ctx.moveTo(0, -24 * scale);
+  ctx.quadraticCurveTo(24 * scale, -20 * scale, 22 * scale, 10 * scale);
+  ctx.quadraticCurveTo(18 * scale, 28 * scale, 0, 28 * scale);
+  ctx.quadraticCurveTo(-18 * scale, 28 * scale, -22 * scale, 10 * scale);
+  ctx.quadraticCurveTo(-24 * scale, -20 * scale, 0, -24 * scale);
+  ctx.closePath();
+
+  const cloakGradient = ctx.createLinearGradient(-22 * scale, 0, 22 * scale, 0);
+  cloakGradient.addColorStop(0, colors.secondary);
+  cloakGradient.addColorStop(0.5, colors.primary);
+  cloakGradient.addColorStop(1, colors.secondary);
+  ctx.fillStyle = cloakGradient;
+  ctx.fill();
+  ctx.strokeStyle = colors.secondary;
+  ctx.lineWidth = 2 * scale;
+  ctx.stroke();
+
+  // 领扣
+  ctx.beginPath();
+  ctx.arc(0, -20 * scale, 5 * scale, 0, Math.PI * 2);
+  const claspGradient = ctx.createRadialGradient(-1 * scale, -21 * scale, 0, 0, -20 * scale, 5 * scale);
+  claspGradient.addColorStop(0, '#ffd700');
+  claspGradient.addColorStop(1, '#b8860b');
+  ctx.fillStyle = claspGradient;
+  ctx.fill();
+
+  // 褶皱线
+  ctx.beginPath();
+  ctx.moveTo(-10 * scale, -16 * scale);
+  ctx.quadraticCurveTo(-12 * scale, 5 * scale, -8 * scale, 24 * scale);
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+  ctx.lineWidth = 1 * scale;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(10 * scale, -16 * scale);
+  ctx.quadraticCurveTo(12 * scale, 5 * scale, 8 * scale, 24 * scale);
+  ctx.stroke();
+
+  ctx.restore();
+};
+
+// 绘制戒指
+const drawRing: DrawFunction = (ctx, size, colors) => {
+  const cx = size / 2;
+  const cy = size / 2;
+  const scale = size / 64;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // 戒环
+  ctx.beginPath();
+  ctx.arc(0, 4 * scale, 16 * scale, 0, Math.PI * 2);
+  ctx.strokeStyle = colors.primary;
+  ctx.lineWidth = 6 * scale;
+  ctx.stroke();
+
+  // 戒环内圈
+  ctx.beginPath();
+  ctx.arc(0, 4 * scale, 16 * scale, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 2 * scale;
+  ctx.stroke();
+
+  // 宝石底座
+  ctx.beginPath();
+  ctx.arc(0, -14 * scale, 8 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = colors.secondary;
+  ctx.fill();
+
+  // 宝石
+  ctx.beginPath();
+  ctx.moveTo(0, -22 * scale);
+  ctx.lineTo(6 * scale, -14 * scale);
+  ctx.lineTo(0, -6 * scale);
+  ctx.lineTo(-6 * scale, -14 * scale);
+  ctx.closePath();
+  const gemGradient = ctx.createRadialGradient(-1 * scale, -16 * scale, 0, 0, -14 * scale, 8 * scale);
+  gemGradient.addColorStop(0, '#ffffff');
+  gemGradient.addColorStop(0.3, colors.primary);
+  gemGradient.addColorStop(1, colors.secondary);
+  ctx.fillStyle = gemGradient;
+  ctx.fill();
+
+  ctx.restore();
+};
+
+// 绘制项链
+const drawAmulet: DrawFunction = (ctx, size, colors) => {
+  const cx = size / 2;
+  const cy = size / 2;
+  const scale = size / 64;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // 链条
+  ctx.beginPath();
+  ctx.moveTo(-18 * scale, -24 * scale);
+  ctx.quadraticCurveTo(-20 * scale, -10 * scale, 0, 0);
+  ctx.quadraticCurveTo(20 * scale, -10 * scale, 18 * scale, -24 * scale);
+  ctx.strokeStyle = '#ffd700';
+  ctx.lineWidth = 2 * scale;
+  ctx.stroke();
+
+  // 吊坠底座
+  ctx.beginPath();
+  ctx.arc(0, 8 * scale, 12 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = colors.secondary;
+  ctx.fill();
+  ctx.strokeStyle = colors.primary;
+  ctx.lineWidth = 2 * scale;
+  ctx.stroke();
+
+  // 中心宝石
+  ctx.beginPath();
+  ctx.arc(0, 8 * scale, 8 * scale, 0, Math.PI * 2);
+  const gemGradient = ctx.createRadialGradient(-2 * scale, 6 * scale, 0, 0, 8 * scale, 8 * scale);
+  gemGradient.addColorStop(0, '#ffffff');
+  gemGradient.addColorStop(0.3, colors.primary);
+  gemGradient.addColorStop(1, colors.secondary);
+  ctx.fillStyle = gemGradient;
+  ctx.fill();
+
+  // 装饰点
+  for (let i = 0; i < 4; i++) {
+    const angle = (i * Math.PI) / 2;
+    const x = Math.cos(angle) * 10 * scale;
+    const y = 8 * scale + Math.sin(angle) * 10 * scale;
+    ctx.beginPath();
+    ctx.arc(x, y, 2 * scale, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd700';
+    ctx.fill();
+  }
+
+  ctx.restore();
+};
+
+// 绘制腰带
+const drawBelt: DrawFunction = (ctx, size, colors) => {
+  const cx = size / 2;
+  const cy = size / 2;
+  const scale = size / 64;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // 腰带主体
+  ctx.beginPath();
+  ctx.roundRect(-28 * scale, -6 * scale, 56 * scale, 12 * scale, 3 * scale);
+  ctx.fillStyle = '#8b4513';
+  ctx.fill();
+  ctx.strokeStyle = '#5d3a1a';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
+
+  // 腰带扣
+  ctx.beginPath();
+  ctx.roundRect(-8 * scale, -10 * scale, 16 * scale, 20 * scale, 2 * scale);
+  ctx.fillStyle = colors.primary;
+  ctx.fill();
+  ctx.strokeStyle = colors.secondary;
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
+
+  // 扣针
+  ctx.beginPath();
+  ctx.roundRect(-2 * scale, -6 * scale, 4 * scale, 12 * scale, 1 * scale);
+  ctx.fillStyle = '#ffd700';
+  ctx.fill();
+
+  // 侧面装饰
+  ctx.beginPath();
+  ctx.arc(-18 * scale, 0, 4 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = colors.secondary;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(18 * scale, 0, 4 * scale, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+};
+
 // 绘制函数映射
-const drawFunctions: Record<EquipmentType, (ctx: CanvasRenderingContext2D, size: number, colors: { primary: string; secondary: string }) => void> = {
+const drawFunctions: Record<EquipmentType, DrawFunction> = {
   sword: drawSword,
-  shield: drawShield,
+  dagger: drawDagger,
+  axe: drawAxe,
+  hammer: drawHammer,
+  bow: drawBow,
   staff: drawStaff,
+  spear: drawSpear,
+  shield: drawShield,
   armor: drawArmor,
   helmet: drawHelmet,
   boots: drawBoots,
+  gloves: drawGloves,
+  cloak: drawCloak,
+  ring: drawRing,
+  amulet: drawAmulet,
+  belt: drawBelt,
 };
 
 export const EquipmentIcon = ({ type, quality = 'common', size = 48, className = '' }: EquipmentIconProps) => {

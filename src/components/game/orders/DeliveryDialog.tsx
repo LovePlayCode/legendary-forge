@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Order, Equipment, Quality } from '@/types/game';
 import { useGameStore } from '@/store/gameStore';
 import { useToast } from '@/hooks/use-toast';
-import { EquipmentIcon } from '@/components/game/common/EquipmentIcon';
+import { EquipmentIconWrapper } from '@/components/game/common/EquipmentIconWrapper';
 
 interface DeliveryDialogProps {
   open: boolean;
@@ -197,7 +197,7 @@ export function DeliveryDialog({ open, onClose, order, equipments }: DeliveryDia
                           qualityIconBg[item.quality]
                         )}
                       >
-                        <EquipmentIcon
+                        <EquipmentIconWrapper
                           type={item.type}
                           quality={item.quality}
                           size={32}
