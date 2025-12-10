@@ -52,11 +52,15 @@ export default {
           peach: '#ea580c', // 熔岩
           sand: '#d6d3d1'   // 石沙
         },
-        // 像素游戏品质色 - 稍高饱和以适应中性背景
+        // 像素游戏品质色 - 7级品质
         quality: {
-          common: '#78716c',
-          rare: '#3b82f6',
-          legendary: '#f59e0b'
+          poor: '#9ca3af',      // 粗糙 - 灰色
+          common: '#78716c',    // 普通 - 石色
+          uncommon: '#22c55e',  // 精良 - 绿色
+          rare: '#3b82f6',      // 稀有 - 蓝色
+          epic: '#a855f7',      // 史诗 - 紫色
+          legendary: '#f59e0b', // 传说 - 橙色
+          mythic: '#ef4444'     // 神话 - 红色
         },
         // 像素游戏色板 - 暖石色系
         pixel: {
@@ -123,6 +127,41 @@ export default {
           '0%, 100%': { transform: 'translateY(0)' },
           '25%': { transform: 'translateY(-4px)' },
           '75%': { transform: 'translateY(2px)' }
+        },
+        'pulse-slow': {
+          '0%, 100%': { opacity: '1', boxShadow: '0 0 12px rgba(59,130,246,0.5)' },
+          '50%': { opacity: '0.9', boxShadow: '0 0 20px rgba(59,130,246,0.7)' }
+        },
+        'glow': {
+          '0%, 100%': { boxShadow: '0 0 15px rgba(234,179,8,0.6), inset 0 0 8px rgba(234,179,8,0.2)' },
+          '50%': { boxShadow: '0 0 25px rgba(234,179,8,0.8), inset 0 0 12px rgba(234,179,8,0.3)' }
+        },
+        'shimmer': {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' }
+        },
+        'float-particle': {
+          '0%, 100%': { transform: 'translateY(0) translateX(0)', opacity: '0.8' },
+          '25%': { transform: 'translateY(-8px) translateX(3px)', opacity: '1' },
+          '50%': { transform: 'translateY(-12px) translateX(-2px)', opacity: '0.6' },
+          '75%': { transform: 'translateY(-6px) translateX(4px)', opacity: '0.9' }
+        },
+        'float-particle-delay': {
+          '0%, 100%': { transform: 'translateY(0) translateX(0)', opacity: '0.7' },
+          '33%': { transform: 'translateY(-10px) translateX(-4px)', opacity: '1' },
+          '66%': { transform: 'translateY(-5px) translateX(3px)', opacity: '0.5' }
+        },
+        'float-particle-slow': {
+          '0%, 100%': { transform: 'translateY(0) translateX(0)', opacity: '0.6' },
+          '50%': { transform: 'translateY(-15px) translateX(5px)', opacity: '0.9' }
+        },
+        'twinkle': {
+          '0%, 100%': { opacity: '0.4', transform: 'scale(0.8)' },
+          '50%': { opacity: '1', transform: 'scale(1.2)' }
+        },
+        'twinkle-delay': {
+          '0%, 100%': { opacity: '0.3', transform: 'scale(0.7)' },
+          '50%': { opacity: '0.9', transform: 'scale(1.1)' }
         }
       },
       animation: {
@@ -132,7 +171,15 @@ export default {
         sparkle: 'sparkle 1s ease-in-out infinite',
         'soft-float': 'soft-float 2s ease-in-out infinite',
         'soft-pulse': 'soft-pulse 2s ease-in-out infinite',
-        'soft-bounce': 'soft-bounce 1s ease-in-out infinite'
+        'soft-bounce': 'soft-bounce 1s ease-in-out infinite',
+        'pulse-slow': 'pulse-slow 2s ease-in-out infinite',
+        'glow': 'glow 2s ease-in-out infinite',
+        'shimmer': 'shimmer 3s ease-in-out infinite',
+        'float-particle': 'float-particle 2s ease-in-out infinite',
+        'float-particle-delay': 'float-particle-delay 2.5s ease-in-out infinite 0.3s',
+        'float-particle-slow': 'float-particle-slow 3s ease-in-out infinite',
+        'twinkle': 'twinkle 1.5s ease-in-out infinite',
+        'twinkle-delay': 'twinkle-delay 1.8s ease-in-out infinite 0.5s'
       }
     }
   },

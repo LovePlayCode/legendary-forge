@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Order, Equipment } from '@/types/game';
+import { Order, Equipment, Quality } from '@/types/game';
 import { useGameStore } from '@/store/gameStore';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,10 +25,37 @@ const iconMap: Record<string, React.ElementType> = {
   GiVisoredHelm,
 };
 
-const qualityColors = {
+// 品质边框颜色
+const qualityBorderColors: Record<Quality, string> = {
+  poor: 'border-gray-400',
   common: 'border-gray-400',
-  rare: 'border-blue-400',
-  legendary: 'border-amber-400',
+  uncommon: 'border-green-500',
+  rare: 'border-blue-500',
+  epic: 'border-purple-500',
+  legendary: 'border-amber-500',
+  mythic: 'border-red-500',
+};
+
+// 品质图标背景
+const qualityIconBg: Record<Quality, string> = {
+  poor: 'bg-gray-400 border-gray-500',
+  common: 'bg-quality-common border-gray-400',
+  uncommon: 'bg-green-500 border-green-600',
+  rare: 'bg-blue-500 border-blue-600',
+  epic: 'bg-purple-500 border-purple-600',
+  legendary: 'bg-amber-500 border-amber-600',
+  mythic: 'bg-red-500 border-red-600',
+};
+
+// 品质分数加成
+const qualityScoreBonus: Record<Quality, number> = {
+  poor: -10,
+  common: 0,
+  uncommon: 10,
+  rare: 20,
+  epic: 30,
+  legendary: 40,
+  mythic: 50,
 };
 
 export function DeliveryDialog({ open, onClose, order, equipments }: DeliveryDialogProps) {
@@ -58,8 +85,8 @@ export function DeliveryDialog({ open, onClose, order, equipments }: DeliveryDia
       score -= 20;
     }
 
-    if (item.quality === 'legendary') score += 30;
-    else if (item.quality === 'rare') score += 15;
+    // 根据品质加分
+    score += qualityScoreBonus[item.quality];
 
     return { matches, score: Math.max(0, Math.min(100, score)) };
   };
@@ -169,18 +196,14 @@ export function DeliveryDialog({ open, onClose, order, equipments }: DeliveryDia
                       isSelected
                         ? 'border-forge-orange bg-forge-peach shadow-md scale-[1.02]'
                         : 'border-forge-brown/50 bg-forge-light hover:bg-forge-cream',
-                      qualityColors[item.quality]
+                      qualityBorderColors[item.quality]
                     )}
                   >
                     <div className="flex items-center gap-3">
                       <div
                         className={cn(
                           'w-12 h-12 rounded-lg flex items-center justify-center border-2',
-                          item.quality === 'legendary'
-                            ? 'bg-quality-legendary border-yellow-500'
-                            : item.quality === 'rare'
-                            ? 'bg-quality-rare border-blue-400'
-                            : 'bg-quality-common border-gray-400'
+                          qualityIconBg[item.quality]
                         )}
                       >
                         <Icon className="text-2xl text-white" />

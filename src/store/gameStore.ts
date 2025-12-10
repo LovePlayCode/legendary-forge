@@ -347,9 +347,14 @@ export const calculateQuality = (
   qualityBonus: number
 ): Quality => {
   const finalScore = (baseScore + qualityBonus * 100) * forgePerformance;
-  if (finalScore >= 80) return 'legendary';
-  if (finalScore >= 50) return 'rare';
-  return 'common';
+  // 品质阈值：粗糙 < 普通 < 精良 < 稀有 < 史诗 < 传说 < 神话
+  if (finalScore >= 95) return 'mythic';
+  if (finalScore >= 85) return 'legendary';
+  if (finalScore >= 70) return 'epic';
+  if (finalScore >= 55) return 'rare';
+  if (finalScore >= 40) return 'uncommon';
+  if (finalScore >= 20) return 'common';
+  return 'poor';
 };
 
 export const generateItemId = () => `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

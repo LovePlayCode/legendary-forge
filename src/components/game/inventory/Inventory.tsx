@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useGameStore } from '@/store/gameStore';
 import { useToast } from '@/hooks/use-toast';
-import { Equipment, Material, Item } from '@/types/game';
+import { Equipment, Material, Item, Quality } from '@/types/game';
 
 const equipmentIcons: Record<string, React.ElementType> = {
   GiPointySword,
@@ -30,10 +30,70 @@ const materialIcons: Record<string, React.ElementType> = {
   GiCoalWagon: GiRock,
 };
 
-const qualityColors = {
+// 品质配置：边框色 + 背景色
+const qualityColors: Record<Quality, string> = {
+  poor: 'border-gray-400 bg-gray-100',
   common: 'border-quality-common bg-forge-sand',
-  rare: 'border-quality-rare bg-pixel-sky/30',
-  legendary: 'border-quality-legendary bg-pixel-lemon/30',
+  uncommon: 'border-green-500 bg-green-50',
+  rare: 'border-blue-500 bg-blue-50',
+  epic: 'border-purple-500 bg-purple-50',
+  legendary: 'border-amber-500 bg-amber-50',
+  mythic: 'border-red-500 bg-red-50',
+};
+
+// 品质图标颜色
+const qualityIconColors: Record<Quality, string> = {
+  poor: 'text-gray-500',
+  common: 'text-forge-dark',
+  uncommon: 'text-green-600',
+  rare: 'text-blue-600',
+  epic: 'text-purple-600',
+  legendary: 'text-amber-600',
+  mythic: 'text-red-600',
+};
+
+// 品质文字颜色
+const qualityTextColors: Record<Quality, string> = {
+  poor: 'text-gray-600',
+  common: 'text-forge-dark',
+  uncommon: 'text-green-700',
+  rare: 'text-blue-700',
+  epic: 'text-purple-700',
+  legendary: 'text-amber-700',
+  mythic: 'text-red-700',
+};
+
+// 品质角标样式
+const qualityBadgeStyles: Record<Quality, string> = {
+  poor: 'bg-gray-400 text-white border-gray-500',
+  common: '',
+  uncommon: 'bg-green-500 text-white border-green-600',
+  rare: 'bg-blue-500 text-white border-blue-600',
+  epic: 'bg-purple-500 text-white border-purple-600',
+  legendary: 'bg-amber-500 text-amber-950 border-amber-600',
+  mythic: 'bg-red-500 text-white border-red-600',
+};
+
+// 品质中文名称
+const qualityNames: Record<Quality, string> = {
+  poor: '粗糙',
+  common: '普通',
+  uncommon: '精良',
+  rare: '稀有',
+  epic: '史诗',
+  legendary: '传说',
+  mythic: '神话',
+};
+
+// 品质详情背景色
+const qualityDetailBg: Record<Quality, string> = {
+  poor: 'bg-gray-400 border-gray-500',
+  common: 'bg-quality-common border-gray-400',
+  uncommon: 'bg-green-500 border-green-600',
+  rare: 'bg-blue-500 border-blue-600',
+  epic: 'bg-purple-500 border-purple-600',
+  legendary: 'bg-amber-500 border-amber-600',
+  mythic: 'bg-red-500 border-red-600',
 };
 
 export function Inventory() {
@@ -90,7 +150,7 @@ export function Inventory() {
   };
 
   const renderEquipmentGrid = () => (
-    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-5 p-4 pt-5">
       {equipments.map((item) => {
         const Icon = equipmentIcons[item.icon] || GiPointySword;
         const isSelected = selectedIds.has(item.id);
@@ -100,15 +160,41 @@ export function Inventory() {
             key={item.id}
             onClick={() => handleItemClick(item)}
             className={cn(
-              'aspect-square rounded-xl border-3 flex flex-col items-center justify-center p-2 transition-all hover:-translate-y-1 hover:shadow-md',
+              'group relative aspect-square rounded-xl border-3 flex flex-col items-center justify-center p-2 transition-all duration-200',
+              'hover:-translate-y-2 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-primary hover:z-10',
               qualityColors[item.quality],
-              isSelected && 'ring-4 ring-forge-orange'
+              isSelected && 'ring-4 ring-primary ring-offset-2 ring-offset-background scale-105 shadow-lg shadow-primary/30 border-primary z-10'
             )}
           >
-            <Icon className="text-3xl text-forge-dark" />
-            <span className="text-[8px] mt-1 truncate w-full text-center text-forge-dark">
+            {/* 选中勾选标记 */}
+            {isSelected && (
+              <div className="absolute -top-3 -right-3 w-6 h-6 bg-primary rounded-full flex items-center justify-center border-2 border-background shadow-md z-20">
+                <svg className="w-4 h-4 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            )}
+            {/* Hover 光晕效果 */}
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
+            <Icon className={cn(
+              'text-3xl transition-all duration-200 group-hover:scale-110 group-hover:text-primary',
+              isSelected ? 'text-primary' : qualityIconColors[item.quality]
+            )} />
+            <span className={cn(
+              'text-[8px] mt-1 truncate w-full text-center transition-colors duration-200 group-hover:text-primary group-hover:font-bold',
+              isSelected ? 'text-primary font-bold' : qualityTextColors[item.quality]
+            )}>
               {item.name.slice(0, 4)}
             </span>
+            {/* 品质标识角标 - 普通品质不显示 */}
+            {item.quality !== 'common' && (
+              <div className={cn(
+                'absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[6px] font-bold border',
+                qualityBadgeStyles[item.quality]
+              )}>
+                {qualityNames[item.quality]}
+              </div>
+            )}
           </button>
         );
       })}
@@ -121,7 +207,7 @@ export function Inventory() {
   );
 
   const renderMaterialGrid = () => (
-    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-5 p-4 pt-5">
       {materials.map((item) => {
         const Icon = materialIcons[item.icon] || GiMetalBar;
 
@@ -129,11 +215,11 @@ export function Inventory() {
           <button
             key={item.id}
             onClick={() => handleItemClick(item)}
-            className="aspect-square rounded-xl border-3 border-forge-brown/50 bg-forge-cream flex flex-col items-center justify-center p-2 transition-all hover:-translate-y-1 hover:shadow-md"
+            className="group aspect-square rounded-xl border-3 border-forge-brown/50 bg-forge-cream flex flex-col items-center justify-center p-2 transition-all duration-200 hover:-translate-y-2 hover:scale-105 hover:shadow-xl hover:shadow-amber-500/20 hover:border-amber-500 hover:bg-amber-50 hover:z-10"
           >
-            <Icon className="text-3xl text-forge-orange" />
-            <span className="text-[8px] mt-1 text-forge-dark">{item.name.slice(0, 3)}</span>
-            <Badge className="mt-1 bg-forge-peach border-2 border-forge-brown/50 text-forge-dark text-[8px] px-1 rounded-md">
+            <Icon className="text-3xl text-forge-orange transition-all duration-200 group-hover:scale-110 group-hover:text-amber-600" />
+            <span className="text-[8px] mt-1 text-forge-dark transition-colors duration-200 group-hover:text-amber-700 group-hover:font-bold">{item.name.slice(0, 3)}</span>
+            <Badge className="mt-1 bg-forge-peach border-2 border-forge-brown/50 text-forge-dark text-[8px] px-1 rounded-md transition-all duration-200 group-hover:bg-amber-500 group-hover:text-white group-hover:border-amber-600">
               x{item.quantity}
             </Badge>
           </button>
@@ -198,7 +284,7 @@ export function Inventory() {
       </div>
 
       {/* Inventory Tabs */}
-      <Card className="bg-forge-light rounded-2xl border-3 border-forge-brown shadow-lg overflow-hidden">
+      <Card className="bg-forge-light rounded-2xl border-3 border-forge-brown shadow-lg">
         <Tabs defaultValue="equipment">
           <CardHeader className="bg-forge-cream border-b-3 border-forge-brown pb-0">
             <TabsList className="bg-transparent">
@@ -218,13 +304,17 @@ export function Inventory() {
           </CardHeader>
           <CardContent className="p-4 bg-forge-light">
             <TabsContent value="equipment" className="mt-0">
-              <ScrollArea className="h-[400px]">
-                {renderEquipmentGrid()}
+              <ScrollArea className="h-[400px] overflow-visible">
+                <div className="pr-4">
+                  {renderEquipmentGrid()}
+                </div>
               </ScrollArea>
             </TabsContent>
             <TabsContent value="materials" className="mt-0">
-              <ScrollArea className="h-[400px]">
-                {renderMaterialGrid()}
+              <ScrollArea className="h-[400px] overflow-visible">
+                <div className="pr-4">
+                  {renderMaterialGrid()}
+                </div>
               </ScrollArea>
             </TabsContent>
           </CardContent>
@@ -247,11 +337,7 @@ export function Inventory() {
                 <div
                   className={cn(
                     'w-24 h-24 rounded-2xl flex items-center justify-center border-3',
-                    selectedItem.quality === 'legendary'
-                      ? 'bg-quality-legendary border-yellow-500 animate-soft-pulse'
-                      : selectedItem.quality === 'rare'
-                      ? 'bg-quality-rare border-blue-400'
-                      : 'bg-quality-common border-gray-400'
+                    qualityDetailBg[selectedItem.quality]
                   )}
                 >
                   {(() => {
@@ -269,19 +355,11 @@ export function Inventory() {
                 <h3 className="text-xs text-forge-dark">{selectedItem.name}</h3>
                 <Badge
                   className={cn(
-                    'mt-2 border-2 border-forge-brown/50 text-[10px] rounded-lg text-white',
-                    selectedItem.quality === 'legendary'
-                      ? 'bg-quality-legendary'
-                      : selectedItem.quality === 'rare'
-                      ? 'bg-quality-rare'
-                      : 'bg-quality-common'
+                    'mt-2 border-2 text-[10px] rounded-lg',
+                    qualityBadgeStyles[selectedItem.quality] || 'bg-quality-common text-white border-gray-400'
                   )}
                 >
-                  {selectedItem.quality === 'legendary'
-                    ? '传说'
-                    : selectedItem.quality === 'rare'
-                    ? '稀有'
-                    : '普通'}
+                  {qualityNames[selectedItem.quality]}
                 </Badge>
               </div>
 

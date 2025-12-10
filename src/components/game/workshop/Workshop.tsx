@@ -66,14 +66,34 @@ export function Workshop() {
         qualityBonus + extraQualityBonus
       );
 
-      const qualityMultiplier =
-        quality === "legendary" ? 1.5 : quality === "rare" ? 1.2 : 1;
+      // 品质倍率映射
+      const qualityMultipliers: Record<Quality, number> = {
+        poor: 0.6,
+        common: 1,
+        uncommon: 1.15,
+        rare: 1.3,
+        epic: 1.5,
+        legendary: 1.8,
+        mythic: 2.2,
+      };
+
+      // 品质前缀映射
+      const qualityPrefixes: Record<Quality, string> = {
+        poor: '粗糙',
+        common: '',
+        uncommon: '精良',
+        rare: '稀有',
+        epic: '史诗',
+        legendary: '传说',
+        mythic: '神话',
+      };
+
+      const qualityMultiplier = qualityMultipliers[quality];
+      const prefix = qualityPrefixes[quality];
 
       const equipment: Equipment = {
         id: generateItemId(),
-        name: `${
-          quality === "legendary" ? "传说" : quality === "rare" ? "精良" : ""
-        }${selectedRecipe.name}`,
+        name: `${prefix}${selectedRecipe.name}`,
         category: "equipment",
         type: selectedRecipe.resultType,
         quality,

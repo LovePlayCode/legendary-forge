@@ -1,4 +1,5 @@
-export type Quality = 'common' | 'rare' | 'legendary';
+// 品质等级：粗糙 < 普通 < 精良 < 稀有 < 史诗 < 传说 < 神话
+export type Quality = 'poor' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
 
 export type ItemCategory = 'equipment' | 'material' | 'consumable';
 
