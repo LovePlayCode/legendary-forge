@@ -33,6 +33,8 @@ interface GameActions {
   hasActiveEffect: (effectType: EffectType) => boolean;
 }
 
+const GAME_VERSION = 2; // 增加版本号用于迁移
+
 const initialState: GameState = {
   gold: 100,
   reputation: 0,
@@ -57,6 +59,7 @@ const initialState: GameState = {
   eventCooldown: EVENT_INTERVAL,
   showEventModal: false,
   currentEventCards: [],
+  version: GAME_VERSION,
 };
 
 export const useGameStore = create<GameState & GameActions>()(
@@ -337,6 +340,31 @@ export const useGameStore = create<GameState & GameActions>()(
     }),
     {
       name: 'legendary-forge-save',
+      // 版本迁移：如果存储的版本低于当前版本，自动重置为新的初始状态
+      migrate: (persistedState: any, version: number) => {
+        if (version < GAME_VERSION) {
+          // 保留一些玩家数据，但重置升级列表
+          const migratedState = { ...initialState } as GameState & GameActions;
+          if (persistedState?.gold) {
+            migratedState.gold = Math.min(persistedState.gold, 100000); // 限制上限
+          }
+          if (persistedState?.reputation) {
+            migratedState.reputation = persistedState.reputation;
+          }
+          if (persistedState?.level) {
+            migratedState.level = persistedState.level;
+          }
+          if (persistedState?.day) {
+            migratedState.day = persistedState.day;
+          }
+          if (persistedState?.inventory) {
+            migratedState.inventory = persistedState.inventory;
+          }
+          migratedState.version = GAME_VERSION;
+          return migratedState;
+        }
+        return persistedState;
+      },
     }
   )
 );

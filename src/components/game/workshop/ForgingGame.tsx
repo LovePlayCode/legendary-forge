@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
-import { GiAnvilImpact, GiFireBowl, GiHammerNails } from 'react-icons/gi';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Recipe } from '@/types/game';
-import { useGameStore } from '@/store/gameStore';
+import { useState, useEffect, useCallback } from "react";
+import { GiAnvilImpact, GiFireBowl, GiHammerNails } from "react-icons/gi";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Recipe } from "@/types/game";
+import { useGameStore } from "@/store/gameStore";
 
 interface ForgingGameProps {
   recipe: Recipe | null;
@@ -13,7 +13,12 @@ interface ForgingGameProps {
   onForgeComplete: (performance: number) => void;
 }
 
-export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }: ForgingGameProps) {
+export function ForgingGame({
+  recipe,
+  isForging,
+  onStartForge,
+  onForgeComplete,
+}: ForgingGameProps) {
   const { forgeSpeed, getMaterial } = useGameStore();
   const [progress, setProgress] = useState(0);
   const [temperature, setTemperature] = useState(50);
@@ -50,8 +55,8 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
 
     const interval = setInterval(() => {
       setProgress((prev) => {
-        const newProgress = prev + (2 * forgeSpeed);
-        
+        const newProgress = prev + 2 * forgeSpeed;
+
         // Calculate temperature score
         const tempDiff = Math.abs(temperature - targetTemp);
         const tempPoints = tempDiff < 10 ? 1 : tempDiff < 20 ? 0.5 : 0;
@@ -95,10 +100,10 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
     const timeout = setTimeout(() => {
       const avgTempScore = tempCount > 0 ? tempScore / tempCount : 0.5;
       const qteBonus = qteSuccess ? 0.2 : 0;
-      const performance = 0.8 + (avgTempScore * 0.2) + qteBonus;
-      
+      const performance = 0.8 + avgTempScore * 0.2 + qteBonus;
+
       onForgeComplete(Math.min(1.2, performance));
-      
+
       // Reset
       setProgress(0);
       setTemperature(50);
@@ -124,9 +129,9 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
 
   const getTempZone = () => {
     const diff = Math.abs(temperature - targetTemp);
-    if (diff < 10) return 'perfect';
-    if (diff < 20) return 'good';
-    return 'bad';
+    if (diff < 10) return "perfect";
+    if (diff < 20) return "good";
+    return "bad";
   };
 
   if (!recipe) {
@@ -144,23 +149,23 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
       <div className="flex-1 flex items-center justify-center relative">
         <div
           className={cn(
-            'w-32 h-32 rounded-3xl flex items-center justify-center transition-all duration-200 border-4 shadow-lg',
-            isForging ? 'animate-soft-pulse' : '',
-            getTempZone() === 'perfect'
-              ? 'bg-green-500/20 border-green-500/50'
-              : getTempZone() === 'good'
-              ? 'bg-amber-500/20 border-amber-500/50'
-              : 'bg-red-500/20 border-red-500/50'
+            "w-32 h-32 rounded-3xl flex items-center justify-center transition-all duration-200 border-4 shadow-lg",
+            isForging ? "animate-soft-pulse" : "",
+            getTempZone() === "perfect"
+              ? "bg-green-500/20 border-green-500/50"
+              : getTempZone() === "good"
+              ? "bg-amber-500/20 border-amber-500/50"
+              : "bg-red-500/20 border-red-500/50"
           )}
         >
           <GiFireBowl
             className={cn(
-              'text-6xl transition-colors',
-              getTempZone() === 'perfect'
-                ? 'text-green-500'
-                : getTempZone() === 'good'
-                ? 'text-amber-500'
-                : 'text-red-500'
+              "text-6xl transition-colors",
+              getTempZone() === "perfect"
+                ? "text-green-500"
+                : getTempZone() === "good"
+                ? "text-amber-500"
+                : "text-red-500"
             )}
           />
         </div>
@@ -176,7 +181,7 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
             </button>
             <div className="absolute bottom-4 left-4 right-4">
               <div className="h-4 bg-muted rounded-lg overflow-hidden border border-border">
-                <div 
+                <div
                   className="h-full bg-gradient-to-r from-red-500 to-amber-500 transition-all duration-50 rounded-md"
                   style={{ width: `${qteWindow}%` }}
                 />
@@ -190,11 +195,13 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
           <div className="absolute inset-0 bg-background/80 backdrop-blur-sm rounded-2xl flex items-center justify-center z-10">
             <div
               className={cn(
-                'text-sm px-6 py-3 rounded-xl border-2 animate-bounce-in shadow-lg font-pixel',
-                qteSuccess ? 'bg-green-500/20 border-green-500 text-green-500' : 'bg-red-500/20 border-red-500 text-red-500'
+                "text-sm px-6 py-3 rounded-xl border-2 animate-bounce-in shadow-lg font-pixel",
+                qteSuccess
+                  ? "bg-green-500/20 border-green-500 text-green-500"
+                  : "bg-red-500/20 border-red-500 text-red-500"
               )}
             >
-              {qteSuccess ? '⭐ 完美! ⭐' : '💥 失误... 💥'}
+              {qteSuccess ? "⭐ 完美! ⭐" : "💥 失误... 💥"}
             </div>
           </div>
         )}
@@ -206,12 +213,12 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
           <span className="text-xs text-muted-foreground">炉温控制</span>
           <span
             className={cn(
-              'text-xs px-3 py-1 rounded-lg border',
-              getTempZone() === 'perfect'
-                ? 'bg-green-500/10 border-green-500/30 text-green-500'
-                : getTempZone() === 'good'
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
-                : 'bg-red-500/10 border-red-500/30 text-red-500'
+              "text-xs px-3 py-1 rounded-lg border",
+              getTempZone() === "perfect"
+                ? "bg-green-500/10 border-green-500/30 text-green-500"
+                : getTempZone() === "good"
+                ? "bg-amber-500/10 border-amber-500/30 text-amber-500"
+                : "bg-red-500/10 border-red-500/30 text-red-500"
             )}
           >
             {Math.round(temperature)}°C
@@ -223,7 +230,7 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
             className="absolute top-1 bottom-1 bg-green-500/20 border-l border-r border-green-500/30 z-0 pointer-events-none"
             style={{
               left: `${targetTemp - 10}%`,
-              width: '20%',
+              width: "20%",
             }}
           />
           <Slider
@@ -241,10 +248,12 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
       <div className="mb-4">
         <div className="flex justify-between mb-2">
           <span className="text-xs text-muted-foreground">锻造进度</span>
-          <span className="text-xs text-primary font-bold">{Math.round(progress)}%</span>
+          <span className="text-xs text-primary font-bold">
+            {Math.round(progress)}%
+          </span>
         </div>
         <div className="h-4 bg-muted rounded-full overflow-hidden border border-border shadow-inner">
-          <div 
+          <div
             className="h-full bg-gradient-to-r from-orange-600 to-amber-500 transition-all duration-100"
             style={{ width: `${progress}%` }}
           />
@@ -256,14 +265,14 @@ export function ForgingGame({ recipe, isForging, onStartForge, onForgeComplete }
         onClick={onStartForge}
         disabled={isForging || !canCraft}
         className={cn(
-          'w-full h-14 text-sm rounded-xl border-b-4 shadow-md transition-all active:border-b-0 active:translate-y-1',
+          "w-full h-14 text-sm rounded-xl border-b-4 shadow-md transition-all active:border-b-0 active:translate-y-1",
           canCraft
-            ? 'bg-primary border-amber-700 hover:bg-amber-400 text-primary-foreground'
-            : 'bg-muted border-muted-foreground/30 text-muted-foreground'
+            ? "bg-primary border-amber-700 hover:bg-amber-400 text-primary-foreground"
+            : "bg-muted border-muted-foreground/30 text-muted-foreground"
         )}
       >
         <GiAnvilImpact className="mr-2 text-2xl" />
-        {isForging ? '锻造中...' : canCraft ? '开始锻造' : '材料不足'}
+        {isForging ? "锻造中..." : canCraft ? "开始锻造" : "材料不足"}
       </Button>
     </div>
   );

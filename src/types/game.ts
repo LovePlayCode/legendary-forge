@@ -201,4 +201,6 @@ export interface GameState {
   eventCooldown: number;        // 下次事件倒计时（秒）
   showEventModal: boolean;      // 是否显示事件弹窗
   currentEventCards: EventCard[]; // 当前可选卡片
+  // 版本控制
+  version?: number;
 }
