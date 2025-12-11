@@ -10,6 +10,7 @@ interface EquipmentIconWrapperProps {
   className?: string;
   use3D?: boolean;
   animate?: boolean;
+  seed?: string; // Add seed prop
 }
 
 // 全局状态管理
@@ -42,6 +43,7 @@ export const EquipmentIconWrapper = ({
   className = '',
   use3D,
   animate = true,
+  seed,
 }: EquipmentIconWrapperProps) => {
   const global3D = useGlobalUse3D();
   const shouldUse3D = use3D ?? global3D;
@@ -64,6 +66,7 @@ export const EquipmentIconWrapper = ({
       quality={quality}
       size={size}
       className={className}
+      seed={seed}
     />
   );
 };

@@ -201,6 +201,7 @@ export function DeliveryDialog({ open, onClose, order, equipments }: DeliveryDia
                           type={item.type}
                           quality={item.quality}
                           size={32}
+                          seed={item.id}
                         />
                       </div>
                       <div className="flex-1">

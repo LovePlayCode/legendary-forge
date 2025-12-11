@@ -161,6 +161,7 @@ export function Inventory() {
               quality={item.quality}
               size={36}
               className="transition-transform duration-200 group-hover:scale-110"
+              seed={item.id}
             />
             <span className={cn(
               'text-[8px] mt-1 truncate w-full text-center transition-colors duration-200 group-hover:text-primary group-hover:font-bold',
@@ -327,6 +328,7 @@ export function Inventory() {
                       type={(selectedItem as Equipment).type}
                       quality={selectedItem.quality}
                       size={64}
+                      seed={selectedItem.id}
                     />
                   ) : (
                     (() => {

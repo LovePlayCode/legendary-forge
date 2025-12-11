@@ -76,6 +76,7 @@ function EquipmentCard({ equipment, compact = false }: { equipment: Equipment; c
             type={equipment.type}
             quality={equipment.quality}
             size={compact ? 40 : 56}
+            seed={equipment.id}
           />
         </div>
 

@@ -67,6 +67,7 @@ export function RecipeSelector({ recipes, selectedRecipe, onSelect, disabled }: 
                     type={recipe.resultType}
                     quality={isSelected ? 'legendary' : 'common'}
                     size={36}
+                    seed={recipe.id}
                   />
                 </div>
 

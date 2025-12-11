@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import type { EquipmentType, Quality } from '@/types/game';
 
 interface EquipmentIconProps {
@@ -6,528 +6,510 @@ interface EquipmentIconProps {
   quality?: Quality;
   size?: number;
   className?: string;
+  seed?: string; // Add seed prop for consistent generation
 }
 
-// 像素风品质颜色 - 更鲜艳的卡通色
-const qualityColors: Record<Quality, { primary: string; secondary: string; outline: string; highlight: string }> = {
-  poor: { primary: '#a0a0a0', secondary: '#707070', outline: '#404040', highlight: '#d0d0d0' },
-  common: { primary: '#c9b896', secondary: '#9a8866', outline: '#5a4836', highlight: '#e8dcc0' },
-  uncommon: { primary: '#5fd35f', secondary: '#3aa03a', outline: '#1a601a', highlight: '#90ff90' },
-  rare: { primary: '#5a9cff', secondary: '#3070d0', outline: '#1a4080', highlight: '#90c0ff' },
-  epic: { primary: '#c77dff', secondary: '#9040d0', outline: '#502080', highlight: '#e0b0ff' },
-  legendary: { primary: '#ffb830', secondary: '#e08000', outline: '#804000', highlight: '#ffe080' },
-  mythic: { primary: '#ff5050', secondary: '#d02020', outline: '#801010', highlight: '#ff9090' },
+// --- Constants & Config ---
+
+const GRID_SIZE = 32; // Standard pixel art icon size
+
+// Enhanced Palettes
+const PALETTE = {
+  metal: {
+    iron: { base: '#8b929c', light: '#c0c5ce', shadow: '#3e4146', outline: '#26292e' },
+    steel: { base: '#a1b2c1', light: '#cfdee9', shadow: '#4a5259', outline: '#2f353b' },
+    silver: { base: '#e6e8eb', light: '#ffffff', shadow: '#7a818c', outline: '#4d535c' },
+    gold: { base: '#f5bd25', light: '#ffeb94', shadow: '#967114', outline: '#664a02' },
+    mythril: { base: '#61a6c1', light: '#a9e1f2', shadow: '#1f3640', outline: '#122026' },
+    adamantite: { base: '#7a6685', light: '#9b84ab', shadow: '#4a3d52', outline: '#2d2433' },
+  },
+  wood: {
+    oak: { base: '#8a624d', light: '#b38d78', shadow: '#5c4033', outline: '#38261e' },
+    mahogany: { base: '#733a26', light: '#9c543b', shadow: '#4a2518', outline: '#2e160e' },
+    ebony: { base: '#424242', light: '#5e5e5e', shadow: '#2b2b2b', outline: '#1a1a1a' },
+  },
+  fabric: {
+    rough: { base: '#8a6a4d', light: '#b38e6b', shadow: '#5c4533', outline: '#382a1e' }, // Burlap/Leather
+    fine_red: { base: '#b33939', light: '#e66767', shadow: '#7a2626', outline: '#4d1818' },
+    fine_blue: { base: '#3960b3', light: '#6791e6', shadow: '#26407a', outline: '#18284d' },
+    fine_green: { base: '#39b348', light: '#67e679', shadow: '#267a30', outline: '#184d1e' },
+    fine_purple: { base: '#8529cf', light: '#bb6bff', shadow: '#5a1c8a', outline: '#320f4d' },
+  },
+  gem: {
+    ruby: '#ff4d4d',
+    sapphire: '#4d79ff',
+    emerald: '#4dff88',
+    topaz: '#ffdf4d',
+    amethyst: '#b34dff',
+    diamond: '#e6ffff',
+  },
+  quality: {
+    poor: '#a0a0a0',
+    common: '#ffffff',
+    uncommon: '#1eff00',
+    rare: '#0070dd',
+    epic: '#a335ee',
+    legendary: '#ff8000',
+    mythic: '#ff0000',
+  }
 };
 
-type DrawFunction = (ctx: CanvasRenderingContext2D, size: number, colors: { primary: string; secondary: string; outline: string; highlight: string }, pixelSize: number) => void;
+// Quality to Material Tier Mapping
+const getMaterialTier = (quality: Quality, type: 'metal' | 'wood' | 'fabric') => {
+  if (type === 'metal') {
+    switch (quality) {
+      case 'poor': return PALETTE.metal.iron;
+      case 'common': return PALETTE.metal.iron;
+      case 'uncommon': return PALETTE.metal.steel;
+      case 'rare': return PALETTE.metal.silver;
+      case 'epic': return PALETTE.metal.gold;
+      case 'legendary': return PALETTE.metal.mythril;
+      case 'mythic': return PALETTE.metal.adamantite;
+    }
+  }
+  if (type === 'wood') {
+    switch (quality) {
+      case 'poor': case 'common': return PALETTE.wood.oak;
+      case 'uncommon': case 'rare': return PALETTE.wood.mahogany;
+      default: return PALETTE.wood.ebony;
+    }
+  }
+  // Default to fabric mapping logic inside generators
+  return PALETTE.fabric.rough;
+};
 
-// 辅助函数：绘制像素方块
-const drawPixel = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) => {
+// --- Utils ---
+
+// Seeded RNG
+const mulberry32 = (a: number) => {
+  return () => {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+const stringToSeed = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0;
+  }
+  return Math.abs(hash);
+};
+
+// Canvas Helpers
+const drawPixel = (ctx: CanvasRenderingContext2D, x: number, y: number, color: string) => {
   ctx.fillStyle = color;
-  ctx.fillRect(Math.floor(x), Math.floor(y), size, size);
+  ctx.fillRect(Math.floor(x), Math.floor(y), 1, 1);
 };
 
-// 辅助函数：绘制像素矩形
-const drawPixelRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string) => {
+const drawRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string) => {
   ctx.fillStyle = color;
-  ctx.fillRect(Math.floor(x), Math.floor(y), w, h);
+  ctx.fillRect(Math.floor(x), Math.floor(y), Math.floor(w), Math.floor(h));
 };
 
-// 像素风剑
-const drawSword: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // 剑刃 - 银色金属
-  drawPixelRect(ctx, cx - p, cy - 12 * p, p * 2, p * 16, '#e0e0e0');
-  drawPixelRect(ctx, cx - p * 0.5, cy - 12 * p, p, p * 16, '#ffffff');
-  drawPixelRect(ctx, cx - p * 2, cy - 10 * p, p, p * 12, '#c0c0c0');
-  drawPixelRect(ctx, cx + p, cy - 10 * p, p, p * 12, '#a0a0a0');
-  // 剑尖
-  drawPixel(ctx, cx - p * 0.5, cy - 13 * p, p, '#ffffff');
-
-  // 护手 - 品质色
-  drawPixelRect(ctx, cx - 4 * p, cy + 4 * p, p * 8, p * 2, colors.primary);
-  drawPixelRect(ctx, cx - 4 * p, cy + 4 * p, p * 8, p, colors.highlight);
-  drawPixelRect(ctx, cx - 5 * p, cy + 4.5 * p, p, p, colors.secondary);
-  drawPixelRect(ctx, cx + 4 * p, cy + 4.5 * p, p, p, colors.secondary);
-
-  // 剑柄 - 棕色
-  drawPixelRect(ctx, cx - p, cy + 6 * p, p * 2, p * 6, '#8b5a2b');
-  drawPixelRect(ctx, cx - p * 0.5, cy + 6 * p, p, p * 6, '#a0522d');
-  // 缠绕
-  drawPixelRect(ctx, cx - p, cy + 7 * p, p * 2, p, '#654321');
-  drawPixelRect(ctx, cx - p, cy + 9 * p, p * 2, p, '#654321');
-  drawPixelRect(ctx, cx - p, cy + 11 * p, p * 2, p, '#654321');
-
-  // 剑首 - 品质色宝石
-  drawPixelRect(ctx, cx - p * 1.5, cy + 12 * p, p * 3, p * 2, colors.primary);
-  drawPixel(ctx, cx - p * 0.5, cy + 12 * p, p, colors.highlight);
-
-  // 描边
-  ctx.strokeStyle = colors.outline;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(cx - p * 2, cy - 12 * p, p * 4, p * 26);
+// Dithering for texture
+const dither = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string, density: number = 0.3, rand: () => number) => {
+  ctx.fillStyle = color;
+  for (let i = x; i < x + w; i++) {
+    for (let j = y; j < y + h; j++) {
+      if (rand() < density) {
+        ctx.fillRect(Math.floor(i), Math.floor(j), 1, 1);
+      }
+    }
+  }
 };
 
-// 像素风匕首
-const drawDagger: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
+// Outline Helper
+const outlineShape = (ctx: CanvasRenderingContext2D, width: number, height: number, color: string) => {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  const newImageData = ctx.createImageData(width, height);
+  const newData = newImageData.data;
 
-  // 短刃
-  drawPixelRect(ctx, cx - p, cy - 8 * p, p * 2, p * 10, '#e0e0e0');
-  drawPixelRect(ctx, cx - p * 0.5, cy - 8 * p, p, p * 10, '#ffffff');
-  drawPixel(ctx, cx - p * 0.5, cy - 9 * p, p, '#ffffff');
+  const getAlpha = (x: number, y: number) => {
+    if (x < 0 || x >= width || y < 0 || y >= height) return 0;
+    return data[(y * width + x) * 4 + 3];
+  };
 
-  // 护手
-  drawPixelRect(ctx, cx - 3 * p, cy + 2 * p, p * 6, p * 2, colors.primary);
-  drawPixelRect(ctx, cx - 3 * p, cy + 2 * p, p * 6, p, colors.highlight);
-
-  // 柄
-  drawPixelRect(ctx, cx - p, cy + 4 * p, p * 2, p * 5, '#8b5a2b');
-  drawPixelRect(ctx, cx - p * 0.5, cy + 4 * p, p, p * 5, '#a0522d');
-
-  // 柄首
-  drawPixelRect(ctx, cx - p * 1.5, cy + 9 * p, p * 3, p * 2, colors.secondary);
-  drawPixel(ctx, cx - p * 0.5, cy + 9 * p, p, colors.highlight);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const alpha = data[(y * width + x) * 4 + 3];
+      if (alpha === 0) {
+        // Check neighbors
+        if (getAlpha(x + 1, y) > 0 || getAlpha(x - 1, y) > 0 || getAlpha(x, y + 1) > 0 || getAlpha(x, y - 1) > 0) {
+          newData[(y * width + x) * 4] = parseInt(color.slice(1, 3), 16);
+          newData[(y * width + x) * 4 + 1] = parseInt(color.slice(3, 5), 16);
+          newData[(y * width + x) * 4 + 2] = parseInt(color.slice(5, 7), 16);
+          newData[(y * width + x) * 4 + 3] = 255;
+        }
+      }
+    }
+  }
+  
+  // Composite outline behind
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = width;
+  tempCanvas.height = height;
+  tempCanvas.getContext('2d')?.putImageData(newImageData, 0, 0);
+  
+  ctx.globalCompositeOperation = 'destination-over';
+  ctx.drawImage(tempCanvas, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
 };
 
-// 像素风战斧
-const drawAxe: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
+// --- Generators ---
 
-  // 斧柄
-  drawPixelRect(ctx, cx - p, cy - 4 * p, p * 2, p * 18, '#8b5a2b');
-  drawPixelRect(ctx, cx - p * 0.5, cy - 4 * p, p, p * 18, '#a0522d');
+// Generic Weapon Generator (Sword, Dagger, Axe, etc.)
+const drawWeapon = (ctx: CanvasRenderingContext2D, type: EquipmentType, quality: Quality, rand: () => number) => {
+  const metal = getMaterialTier(quality, 'metal');
+  const wood = getMaterialTier(quality, 'wood');
+  const gemColor = Object.values(PALETTE.gem)[Math.floor(rand() * Object.values(PALETTE.gem).length)];
+  
+  const cx = 16;
+  const cy = 16;
 
-  // 斧刃 - 左侧
-  drawPixelRect(ctx, cx - 6 * p, cy - 8 * p, p * 5, p * 2, '#c0c0c0');
-  drawPixelRect(ctx, cx - 7 * p, cy - 6 * p, p * 6, p * 2, '#d0d0d0');
-  drawPixelRect(ctx, cx - 8 * p, cy - 4 * p, p * 7, p * 2, '#e0e0e0');
-  drawPixelRect(ctx, cx - 8 * p, cy - 2 * p, p * 7, p * 2, '#e0e0e0');
-  drawPixelRect(ctx, cx - 7 * p, cy, p * 6, p * 2, '#d0d0d0');
-  drawPixelRect(ctx, cx - 6 * p, cy + 2 * p, p * 5, p * 2, '#c0c0c0');
+  if (type === 'sword' || type === 'dagger') {
+    const isDagger = type === 'dagger';
+    const bladeLen = isDagger ? 10 + Math.floor(rand() * 4) : 16 + Math.floor(rand() * 6);
+    const bladeWidth = isDagger ? 2 : 2 + Math.floor(rand() * 2);
+    const hiltLen = isDagger ? 4 : 5 + Math.floor(rand() * 2);
+    
+    // Blade
+    ctx.fillStyle = metal.base;
+    for(let i=0; i<bladeLen; i++) {
+        // Tapering
+        let w = bladeWidth;
+        if (i > bladeLen - 3) w = Math.max(1, w - 1); // Tip
+        const bx = cx - w/2 + (rand() * 0.5); // Micro-variation
+        drawRect(ctx, Math.floor(bx), cy - hiltLen - i, w, 1, metal.base);
+        // Shine/Reflection
+        if (i < bladeLen - 2) drawRect(ctx, Math.floor(bx) + 1, cy - hiltLen - i, 1, 1, metal.light);
+    }
 
-  // 高光
-  drawPixelRect(ctx, cx - 7 * p, cy - 4 * p, p, p * 6, '#ffffff');
+    // Guard
+    const guardWidth = isDagger ? 4 + rand()*2 : 6 + rand()*4;
+    const guardY = cy - hiltLen;
+    drawRect(ctx, cx - guardWidth/2, guardY, guardWidth, 2, metal.shadow);
+    drawRect(ctx, cx - guardWidth/2 + 1, guardY + 0.5, guardWidth - 2, 1, metal.base);
 
-  // 装饰环
-  drawPixelRect(ctx, cx - 2 * p, cy - 2 * p, p * 4, p * 2, colors.primary);
-  drawPixelRect(ctx, cx - 2 * p, cy - 2 * p, p * 4, p, colors.highlight);
+    // Hilt
+    drawRect(ctx, cx - 1, cy - hiltLen + 2, 2, hiltLen, wood.base);
+    dither(ctx, cx - 1, cy - hiltLen + 2, 2, hiltLen, wood.shadow, 0.3, rand);
+
+    // Pommel
+    drawRect(ctx, cx - 1.5, cy, 3, 2, metal.base);
+    if (['rare', 'epic', 'legendary', 'mythic'].includes(quality)) {
+        drawPixel(ctx, cx, cy + 0.5, gemColor);
+    }
+  }
+  
+  if (type === 'axe' || type === 'hammer' || type === 'spear' || type === 'staff') {
+     // Pole/Handle
+     const poleLen = type === 'spear' || type === 'staff' ? 26 : 20;
+     const poleWidth = 2;
+     drawRect(ctx, cx - poleWidth/2, cy - poleLen/2 + 4, poleWidth, poleLen, wood.base);
+     dither(ctx, cx - poleWidth/2, cy - poleLen/2 + 4, poleWidth, poleLen, wood.shadow, 0.3, rand);
+     
+     // Head
+     if (type === 'axe') {
+        const headW = 10;
+        const headH = 8;
+        const headY = cy - poleLen/2 + 6;
+        // Double bit or Single bit
+        const doubleBit = rand() > 0.5;
+        
+        // Right blade
+        drawRect(ctx, cx + 1, headY - headH/2, headW/2, headH, metal.base);
+        drawRect(ctx, cx + 1 + headW/2 - 1, headY - headH/2, 1, headH, metal.light); // Edge
+        
+        // Left blade
+        if (doubleBit) {
+            drawRect(ctx, cx - 1 - headW/2, headY - headH/2, headW/2, headH, metal.base);
+            drawRect(ctx, cx - 1 - headW/2, headY - headH/2, 1, headH, metal.light); // Edge
+        } else {
+             drawRect(ctx, cx - 3, headY - headH/4, 3, headH/2, metal.shadow); // Back
+        }
+     }
+     
+     if (type === 'hammer') {
+        const headW = 10;
+        const headH = 6;
+        const headY = cy - poleLen/2 + 6;
+        drawRect(ctx, cx - headW/2, headY - headH/2, headW, headH, metal.base);
+        drawRect(ctx, cx - headW/2 + 1, headY - headH/2 + 1, headW - 2, headH - 2, metal.light);
+        // Bands
+        drawRect(ctx, cx - headW/2 + 3, headY - headH/2, 1, headH, metal.shadow);
+        drawRect(ctx, cx + headW/2 - 4, headY - headH/2, 1, headH, metal.shadow);
+     }
+
+     if (type === 'spear') {
+        const tipLen = 8;
+        const tipY = cy - poleLen/2 + 4;
+        // Tip
+        for(let i=0; i<tipLen; i++) {
+            const w = Math.max(1, 3 - Math.floor(i/2));
+            drawRect(ctx, cx - w/2, tipY - i, w, 1, metal.base);
+        }
+     }
+     
+     if (type === 'staff') {
+         // Orb or Gem
+         const orbSize = 5;
+         const orbY = cy - poleLen/2 + 2;
+         drawRect(ctx, cx - orbSize/2, orbY - orbSize/2, orbSize, orbSize, gemColor);
+         drawPixel(ctx, cx - 1, orbY - 1, '#fff'); // Highlight
+         // Prongs
+         drawRect(ctx, cx - orbSize/2 - 1, orbY, 1, 4, wood.light);
+         drawRect(ctx, cx + orbSize/2, orbY, 1, 4, wood.light);
+     }
+  }
+
+  if (type === 'bow') {
+    const bowLen = 24;
+    // Draw Curve
+    ctx.fillStyle = wood.base;
+    for(let i=0; i<=bowLen; i++) {
+        const t = i / bowLen;
+        const offset = Math.sin(t * Math.PI) * 6;
+        drawPixel(ctx, cx - 6 + offset, cy - bowLen/2 + i, wood.base);
+        // String
+        drawPixel(ctx, cx - 6, cy - bowLen/2 + i, '#dddddd');
+    }
+    // Grip
+    drawRect(ctx, cx - 6 + 6 - 1, cy - 2, 2, 4, getMaterialTier(quality, 'metal').base); // Metal grip
+  }
 };
 
-// 像素风战锤
-const drawHammer: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
+const drawArmor = (ctx: CanvasRenderingContext2D, type: EquipmentType, quality: Quality, rand: () => number) => {
+    const metal = getMaterialTier(quality, 'metal');
+    const fabric = Object.values(PALETTE.fabric)[Math.floor(rand() * Object.values(PALETTE.fabric).length)];
+    const cx = 16;
+    const cy = 16;
 
-  // 锤柄
-  drawPixelRect(ctx, cx - p, cy - 2 * p, p * 2, p * 16, '#8b5a2b');
-  drawPixelRect(ctx, cx - p * 0.5, cy - 2 * p, p, p * 16, '#a0522d');
+    if (type === 'shield') {
+        const shapes = ['round', 'heater'];
+        const shape = shapes[Math.floor(rand() * shapes.length)];
+        
+        if (shape === 'round') {
+            const r = 12;
+            // Base
+            for(let y=-r; y<=r; y++) {
+                for(let x=-r; x<=r; x++) {
+                    if (x*x + y*y <= r*r) {
+                        drawPixel(ctx, cx+x, cy+y, metal.base);
+                    }
+                }
+            }
+            // Rim
+            for(let y=-r; y<=r; y++) {
+                for(let x=-r; x<=r; x++) {
+                    if (x*x + y*y <= r*r && x*x + y*y > (r-2)*(r-2)) {
+                        drawPixel(ctx, cx+x, cy+y, metal.shadow);
+                    }
+                }
+            }
+            // Emblem
+            drawRect(ctx, cx - 4, cy - 4, 8, 8, fabric.base);
+        } else {
+             // Heater shield
+             const w = 18;
+             const h = 22;
+             drawRect(ctx, cx - w/2, cy - h/2, w, h/2, metal.base);
+             // Bottom curve approximation
+             for(let i=0; i<h/2; i++) {
+                 const currentW = w * (1 - i/(h/2));
+                 drawRect(ctx, cx - currentW/2, cy + i, currentW, 1, metal.base);
+             }
+             // Cross pattern
+             drawRect(ctx, cx - 2, cy - h/2 + 2, 4, h - 4, fabric.base);
+             drawRect(ctx, cx - w/2 + 2, cy - 2, w - 4, 4, fabric.base);
+        }
+    }
+    
+    if (type === 'armor' || type === 'cloak') {
+        const isCloak = type === 'cloak';
+        const baseColor = isCloak ? fabric.base : metal.base;
+        const secColor = isCloak ? fabric.shadow : metal.shadow;
+        
+        // Shoulders
+        drawRect(ctx, cx - 9, cy - 10, 6, 4, secColor);
+        drawRect(ctx, cx + 3, cy - 10, 6, 4, secColor);
+        
+        // Body
+        drawRect(ctx, cx - 7, cy - 8, 14, 16, baseColor);
+        
+        // Detail/Folds
+        if (isCloak) {
+             drawRect(ctx, cx - 4, cy - 6, 2, 14, secColor);
+             drawRect(ctx, cx + 2, cy - 6, 2, 14, secColor);
+        } else {
+             // Chest plate shine
+             drawRect(ctx, cx - 4, cy - 4, 4, 4, metal.light);
+        }
+    }
+    
+    if (type === 'helmet') {
+        drawRect(ctx, cx - 6, cy - 8, 12, 12, metal.base);
+        // Visor
+        drawRect(ctx, cx - 6, cy - 2, 12, 1, metal.shadow);
+        drawRect(ctx, cx - 2, cy - 2, 4, 6, metal.shadow); // Vertical slit
+        // Plume?
+        if (rand() > 0.5) {
+             drawRect(ctx, cx - 2, cy - 12, 4, 4, fabric.base);
+        }
+    }
 
-  // 锤头
-  drawPixelRect(ctx, cx - 6 * p, cy - 10 * p, p * 12, p * 8, '#909090');
-  drawPixelRect(ctx, cx - 5 * p, cy - 9 * p, p * 10, p * 6, '#b0b0b0');
-  drawPixelRect(ctx, cx - 4 * p, cy - 8 * p, p * 8, p * 4, '#d0d0d0');
+    if (type === 'gloves') {
+        const color = metal.base;
+        // Left glove
+        drawRect(ctx, cx - 10, cy - 6, 6, 8, color); // Palm
+        drawRect(ctx, cx - 10, cy + 2, 6, 4, metal.shadow); // Cuff
+        drawRect(ctx, cx - 4, cy - 4, 2, 4, color); // Thumb
+        
+        // Right glove
+        drawRect(ctx, cx + 4, cy - 6, 6, 8, color);
+        drawRect(ctx, cx + 4, cy + 2, 6, 4, metal.shadow);
+        drawRect(ctx, cx + 2, cy - 4, 2, 4, color);
+    }
 
-  // 高光
-  drawPixelRect(ctx, cx - 4 * p, cy - 9 * p, p * 2, p, '#ffffff');
-
-  // 装饰带
-  drawPixelRect(ctx, cx - 6 * p, cy - 6 * p, p * 12, p * 2, colors.primary);
-  drawPixelRect(ctx, cx - 6 * p, cy - 6 * p, p * 12, p, colors.highlight);
+    if (type === 'boots') {
+        const color = getMaterialTier(quality, 'wood').base; // Leather
+        // Left Boot
+        drawRect(ctx, cx - 8, cy - 2, 6, 8, color); // Leg
+        drawRect(ctx, cx - 10, cy + 6, 8, 4, color); // Foot
+        
+        // Right Boot
+        drawRect(ctx, cx + 2, cy - 2, 6, 8, color);
+        drawRect(ctx, cx + 2, cy + 6, 8, 4, color);
+    }
 };
 
-// 像素风弓
-const drawBow: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // 弓身 - 曲线用像素阶梯表示
-  drawPixelRect(ctx, cx - 6 * p, cy - 10 * p, p * 2, p * 3, '#8b5a2b');
-  drawPixelRect(ctx, cx - 7 * p, cy - 7 * p, p * 2, p * 3, '#8b5a2b');
-  drawPixelRect(ctx, cx - 8 * p, cy - 4 * p, p * 2, p * 8, '#8b5a2b');
-  drawPixelRect(ctx, cx - 7 * p, cy + 4 * p, p * 2, p * 3, '#8b5a2b');
-  drawPixelRect(ctx, cx - 6 * p, cy + 7 * p, p * 2, p * 3, '#8b5a2b');
-
-  // 弓身高光
-  drawPixelRect(ctx, cx - 5 * p, cy - 10 * p, p, p * 3, '#a0522d');
-  drawPixelRect(ctx, cx - 6 * p, cy - 7 * p, p, p * 3, '#a0522d');
-  drawPixelRect(ctx, cx - 7 * p, cy - 4 * p, p, p * 8, '#a0522d');
-  drawPixelRect(ctx, cx - 6 * p, cy + 4 * p, p, p * 3, '#a0522d');
-  drawPixelRect(ctx, cx - 5 * p, cy + 7 * p, p, p * 3, '#a0522d');
-
-  // 弓弦
-  drawPixelRect(ctx, cx - 4 * p, cy - 10 * p, p, p * 20, '#d0d0d0');
-
-  // 握把
-  drawPixelRect(ctx, cx - 8 * p, cy - 2 * p, p * 3, p * 4, colors.primary);
-  drawPixelRect(ctx, cx - 7 * p, cy - 2 * p, p, p * 4, colors.highlight);
-
-  // 弓尖装饰
-  drawPixelRect(ctx, cx - 5 * p, cy - 11 * p, p * 2, p * 2, colors.secondary);
-  drawPixelRect(ctx, cx - 5 * p, cy + 9 * p, p * 2, p * 2, colors.secondary);
+const drawAccessory = (ctx: CanvasRenderingContext2D, type: EquipmentType, quality: Quality, rand: () => number) => {
+    const metal = getMaterialTier(quality, 'metal');
+    const gemColor = Object.values(PALETTE.gem)[Math.floor(rand() * Object.values(PALETTE.gem).length)];
+    const cx = 16;
+    const cy = 16;
+    
+    if (type === 'ring') {
+        // Band
+        for(let i=0; i<360; i+=10) {
+            const rad = i * Math.PI / 180;
+            const x = cx + Math.cos(rad) * 8;
+            const y = cy + Math.sin(rad) * 6; // Ellipse
+            drawPixel(ctx, x, y, metal.base);
+        }
+        // Gem
+        drawRect(ctx, cx - 3, cy - 8, 6, 6, gemColor);
+        drawRect(ctx, cx - 1, cy - 6, 2, 2, '#fff');
+    }
+    
+    if (type === 'amulet') {
+         // Chain
+        for(let i=0; i<180; i+=15) {
+            const rad = (i + 180) * Math.PI / 180;
+            const x = cx + Math.cos(rad) * 10;
+            const y = cy + Math.sin(rad) * 10 - 5;
+            drawPixel(ctx, x, y, metal.base);
+        }
+        // Pendant
+        drawRect(ctx, cx - 4, cy + 4, 8, 8, metal.shadow);
+        drawRect(ctx, cx - 2, cy + 6, 4, 4, gemColor);
+    }
+    
+    if (type === 'belt') {
+        drawRect(ctx, cx - 14, cy - 2, 28, 4, PALETTE.wood.oak.base); // Leather
+        drawRect(ctx, cx - 3, cy - 3, 6, 6, metal.base); // Buckle
+    }
 };
 
-// 像素风法杖
-const drawStaff: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // 法杖杆
-  drawPixelRect(ctx, cx - p, cy - 4 * p, p * 2, p * 18, '#654321');
-  drawPixelRect(ctx, cx - p * 0.5, cy - 4 * p, p, p * 18, '#8b5a2b');
-
-  // 法杖头 - 装饰框
-  drawPixelRect(ctx, cx - 4 * p, cy - 10 * p, p * 8, p * 2, colors.secondary);
-  drawPixelRect(ctx, cx - 5 * p, cy - 8 * p, p * 2, p * 4, colors.secondary);
-  drawPixelRect(ctx, cx + 3 * p, cy - 8 * p, p * 2, p * 4, colors.secondary);
-  drawPixelRect(ctx, cx - 4 * p, cy - 4 * p, p * 8, p * 2, colors.secondary);
-
-  // 魔法宝珠
-  drawPixelRect(ctx, cx - 3 * p, cy - 8 * p, p * 6, p * 4, colors.primary);
-  drawPixelRect(ctx, cx - 2 * p, cy - 7 * p, p * 4, p * 2, colors.highlight);
-  drawPixel(ctx, cx - p, cy - 7 * p, p, '#ffffff');
-
-  // 杖底装饰
-  drawPixelRect(ctx, cx - 2 * p, cy + 12 * p, p * 4, p * 2, colors.secondary);
-};
-
-// 像素风长矛
-const drawSpear: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // 矛杆
-  drawPixelRect(ctx, cx - p, cy - 6 * p, p * 2, p * 20, '#8b5a2b');
-  drawPixelRect(ctx, cx - p * 0.5, cy - 6 * p, p, p * 20, '#a0522d');
-
-  // 矛尖
-  drawPixelRect(ctx, cx - p, cy - 10 * p, p * 2, p * 4, '#d0d0d0');
-  drawPixelRect(ctx, cx - 2 * p, cy - 8 * p, p * 4, p * 2, '#c0c0c0');
-  drawPixelRect(ctx, cx - 3 * p, cy - 6 * p, p * 6, p * 2, '#b0b0b0');
-  drawPixel(ctx, cx - p * 0.5, cy - 11 * p, p, '#ffffff');
-  drawPixel(ctx, cx - p * 0.5, cy - 10 * p, p, '#ffffff');
-
-  // 装饰环
-  drawPixelRect(ctx, cx - 2 * p, cy - 4 * p, p * 4, p * 2, colors.primary);
-  drawPixelRect(ctx, cx - 2 * p, cy - 4 * p, p * 4, p, colors.highlight);
-
-  // 矛尾装饰
-  drawPixelRect(ctx, cx - 2 * p, cy + 12 * p, p * 4, p * 2, colors.secondary);
-};
-
-// 像素风盾牌
-const drawShield: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // 盾牌主体 - 像素化的盾形
-  drawPixelRect(ctx, cx - 6 * p, cy - 10 * p, p * 12, p * 2, colors.secondary);
-  drawPixelRect(ctx, cx - 8 * p, cy - 8 * p, p * 16, p * 4, colors.primary);
-  drawPixelRect(ctx, cx - 8 * p, cy - 4 * p, p * 16, p * 6, colors.primary);
-  drawPixelRect(ctx, cx - 7 * p, cy + 2 * p, p * 14, p * 4, colors.primary);
-  drawPixelRect(ctx, cx - 5 * p, cy + 6 * p, p * 10, p * 3, colors.primary);
-  drawPixelRect(ctx, cx - 3 * p, cy + 9 * p, p * 6, p * 2, colors.primary);
-  drawPixelRect(ctx, cx - p, cy + 11 * p, p * 2, p, colors.primary);
-
-  // 高光
-  drawPixelRect(ctx, cx - 6 * p, cy - 8 * p, p * 2, p * 8, colors.highlight);
-  drawPixelRect(ctx, cx - 4 * p, cy - 6 * p, p, p * 4, colors.highlight);
-
-  // 边框
-  drawPixelRect(ctx, cx - 8 * p, cy - 8 * p, p, p * 10, colors.secondary);
-  drawPixelRect(ctx, cx + 7 * p, cy - 8 * p, p, p * 10, colors.secondary);
-
-  // 中心装饰 - 十字或宝石
-  drawPixelRect(ctx, cx - p, cy - 2 * p, p * 2, p * 6, '#ffd700');
-  drawPixelRect(ctx, cx - 3 * p, cy, p * 6, p * 2, '#ffd700');
-  drawPixel(ctx, cx - p * 0.5, cy + p * 0.5, p, '#ffffff');
-};
-
-// 像素风护甲
-const drawArmor: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // 护甲主体
-  drawPixelRect(ctx, cx - 6 * p, cy - 8 * p, p * 12, p * 2, colors.primary);
-  drawPixelRect(ctx, cx - 8 * p, cy - 6 * p, p * 16, p * 4, colors.primary);
-  drawPixelRect(ctx, cx - 7 * p, cy - 2 * p, p * 14, p * 8, colors.primary);
-  drawPixelRect(ctx, cx - 6 * p, cy + 6 * p, p * 12, p * 4, colors.primary);
-
-  // 领口
-  drawPixelRect(ctx, cx - 3 * p, cy - 10 * p, p * 6, p * 2, colors.secondary);
-  drawPixelRect(ctx, cx - 2 * p, cy - 10 * p, p * 4, p, colors.primary);
-
-  // 肩甲
-  drawPixelRect(ctx, cx - 10 * p, cy - 6 * p, p * 3, p * 4, colors.secondary);
-  drawPixelRect(ctx, cx + 7 * p, cy - 6 * p, p * 3, p * 4, colors.secondary);
-
-  // 高光
-  drawPixelRect(ctx, cx - 5 * p, cy - 6 * p, p * 2, p * 10, colors.highlight);
-
-  // 中线装饰
-  drawPixelRect(ctx, cx - p, cy - 4 * p, p * 2, p * 12, colors.secondary);
-  drawPixelRect(ctx, cx - p * 0.5, cy - 4 * p, p, p * 12, colors.highlight);
-
-  // 腰带
-  drawPixelRect(ctx, cx - 6 * p, cy + 4 * p, p * 12, p * 2, '#8b5a2b');
-  drawPixelRect(ctx, cx - 2 * p, cy + 4 * p, p * 4, p * 2, '#ffd700');
-};
-
-// 像素风头盔
-const drawHelmet: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // 头盔主体
-  drawPixelRect(ctx, cx - 4 * p, cy - 10 * p, p * 8, p * 2, colors.primary);
-  drawPixelRect(ctx, cx - 6 * p, cy - 8 * p, p * 12, p * 4, colors.primary);
-  drawPixelRect(ctx, cx - 7 * p, cy - 4 * p, p * 14, p * 8, colors.primary);
-  drawPixelRect(ctx, cx - 6 * p, cy + 4 * p, p * 12, p * 4, colors.primary);
-
-  // 高光
-  drawPixelRect(ctx, cx - 5 * p, cy - 8 * p, p * 2, p * 10, colors.highlight);
-
-  // 面罩开口
-  drawPixelRect(ctx, cx - 4 * p, cy, p * 8, p * 6, '#2a2a2a');
-
-  // 面罩横条
-  drawPixelRect(ctx, cx - 4 * p, cy + p, p * 8, p, colors.secondary);
-  drawPixelRect(ctx, cx - 4 * p, cy + 3 * p, p * 8, p, colors.secondary);
-
-  // 顶部装饰
-  drawPixelRect(ctx, cx - p, cy - 12 * p, p * 2, p * 3, colors.secondary);
-  drawPixel(ctx, cx - p * 0.5, cy - 12 * p, p, colors.highlight);
-};
-
-// 像素风靴子
-const drawBoots: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // 左靴
-  drawPixelRect(ctx, cx - 10 * p, cy - 8 * p, p * 6, p * 12, colors.primary);
-  drawPixelRect(ctx, cx - 12 * p, cy + 4 * p, p * 10, p * 4, colors.primary);
-  drawPixelRect(ctx, cx - 9 * p, cy - 8 * p, p * 2, p * 12, colors.highlight);
-
-  // 右靴
-  drawPixelRect(ctx, cx + 4 * p, cy - 8 * p, p * 6, p * 12, colors.primary);
-  drawPixelRect(ctx, cx + 2 * p, cy + 4 * p, p * 10, p * 4, colors.primary);
-  drawPixelRect(ctx, cx + 5 * p, cy - 8 * p, p * 2, p * 12, colors.highlight);
-
-  // 靴口装饰
-  drawPixelRect(ctx, cx - 10 * p, cy - 10 * p, p * 6, p * 2, colors.secondary);
-  drawPixelRect(ctx, cx + 4 * p, cy - 10 * p, p * 6, p * 2, colors.secondary);
-
-  // 鞋带/装饰
-  drawPixelRect(ctx, cx - 8 * p, cy - 4 * p, p * 2, p, colors.secondary);
-  drawPixelRect(ctx, cx - 8 * p, cy - 2 * p, p * 2, p, colors.secondary);
-  drawPixelRect(ctx, cx - 8 * p, cy, p * 2, p, colors.secondary);
-
-  drawPixelRect(ctx, cx + 6 * p, cy - 4 * p, p * 2, p, colors.secondary);
-  drawPixelRect(ctx, cx + 6 * p, cy - 2 * p, p * 2, p, colors.secondary);
-  drawPixelRect(ctx, cx + 6 * p, cy, p * 2, p, colors.secondary);
-};
-
-// 像素风手套
-const drawGloves: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // 左手套
-  drawPixelRect(ctx, cx - 12 * p, cy - 2 * p, p * 8, p * 10, colors.primary);
-  drawPixelRect(ctx, cx - 11 * p, cy - 2 * p, p * 2, p * 10, colors.highlight);
-  // 手指
-  drawPixelRect(ctx, cx - 12 * p, cy - 8 * p, p * 2, p * 6, colors.primary);
-  drawPixelRect(ctx, cx - 9 * p, cy - 10 * p, p * 2, p * 8, colors.primary);
-  drawPixelRect(ctx, cx - 6 * p, cy - 10 * p, p * 2, p * 8, colors.primary);
-
-  // 右手套
-  drawPixelRect(ctx, cx + 4 * p, cy - 2 * p, p * 8, p * 10, colors.primary);
-  drawPixelRect(ctx, cx + 5 * p, cy - 2 * p, p * 2, p * 10, colors.highlight);
-  // 手指
-  drawPixelRect(ctx, cx + 10 * p, cy - 8 * p, p * 2, p * 6, colors.primary);
-  drawPixelRect(ctx, cx + 7 * p, cy - 10 * p, p * 2, p * 8, colors.primary);
-  drawPixelRect(ctx, cx + 4 * p, cy - 10 * p, p * 2, p * 8, colors.primary);
-
-  // 护腕
-  drawPixelRect(ctx, cx - 12 * p, cy + 6 * p, p * 8, p * 3, colors.secondary);
-  drawPixelRect(ctx, cx + 4 * p, cy + 6 * p, p * 8, p * 3, colors.secondary);
-};
-
-// 像素风披风
-const drawCloak: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // 披风主体
-  drawPixelRect(ctx, cx - 8 * p, cy - 10 * p, p * 16, p * 2, colors.primary);
-  drawPixelRect(ctx, cx - 10 * p, cy - 8 * p, p * 20, p * 6, colors.primary);
-  drawPixelRect(ctx, cx - 10 * p, cy - 2 * p, p * 20, p * 8, colors.primary);
-  drawPixelRect(ctx, cx - 8 * p, cy + 6 * p, p * 16, p * 4, colors.primary);
-  drawPixelRect(ctx, cx - 6 * p, cy + 10 * p, p * 12, p * 2, colors.primary);
-
-  // 高光
-  drawPixelRect(ctx, cx - 8 * p, cy - 8 * p, p * 2, p * 14, colors.highlight);
-
-  // 阴影褶皱
-  drawPixelRect(ctx, cx + 4 * p, cy - 6 * p, p, p * 12, colors.secondary);
-
-  // 领扣
-  drawPixelRect(ctx, cx - 2 * p, cy - 10 * p, p * 4, p * 3, '#ffd700');
-  drawPixel(ctx, cx - p * 0.5, cy - 9 * p, p, '#ffffff');
-
-  // 底部波浪
-  drawPixelRect(ctx, cx - 6 * p, cy + 10 * p, p * 2, p * 2, colors.secondary);
-  drawPixelRect(ctx, cx - 2 * p, cy + 11 * p, p * 2, p, colors.secondary);
-  drawPixelRect(ctx, cx + 2 * p, cy + 10 * p, p * 2, p * 2, colors.secondary);
-};
-
-// 像素风戒指
-const drawRing: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // 戒环 - 像素圆环
-  drawPixelRect(ctx, cx - 6 * p, cy, p * 12, p * 3, colors.primary);
-  drawPixelRect(ctx, cx - 7 * p, cy + 3 * p, p * 14, p * 4, colors.primary);
-  drawPixelRect(ctx, cx - 6 * p, cy + 7 * p, p * 12, p * 3, colors.primary);
-
-  // 内圈空洞
-  drawPixelRect(ctx, cx - 4 * p, cy + 2 * p, p * 8, p * 6, '#1a1a2e');
-
-  // 高光
-  drawPixelRect(ctx, cx - 5 * p, cy + p, p * 2, p * 6, colors.highlight);
-
-  // 宝石底座
-  drawPixelRect(ctx, cx - 4 * p, cy - 6 * p, p * 8, p * 6, colors.secondary);
-
-  // 宝石
-  drawPixelRect(ctx, cx - 3 * p, cy - 5 * p, p * 6, p * 4, colors.primary);
-  drawPixelRect(ctx, cx - 2 * p, cy - 4 * p, p * 4, p * 2, colors.highlight);
-  drawPixel(ctx, cx - p, cy - 4 * p, p, '#ffffff');
-};
-
-// 像素风项链
-const drawAmulet: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // 链条
-  drawPixelRect(ctx, cx - 8 * p, cy - 12 * p, p * 2, p * 4, '#ffd700');
-  drawPixelRect(ctx, cx - 6 * p, cy - 10 * p, p * 2, p * 4, '#ffd700');
-  drawPixelRect(ctx, cx - 4 * p, cy - 8 * p, p * 2, p * 4, '#ffd700');
-  drawPixelRect(ctx, cx - 2 * p, cy - 6 * p, p * 4, p * 4, '#ffd700');
-  drawPixelRect(ctx, cx + 2 * p, cy - 8 * p, p * 2, p * 4, '#ffd700');
-  drawPixelRect(ctx, cx + 4 * p, cy - 10 * p, p * 2, p * 4, '#ffd700');
-  drawPixelRect(ctx, cx + 6 * p, cy - 12 * p, p * 2, p * 4, '#ffd700');
-
-  // 吊坠底座
-  drawPixelRect(ctx, cx - 5 * p, cy - 2 * p, p * 10, p * 2, colors.secondary);
-  drawPixelRect(ctx, cx - 6 * p, cy, p * 12, p * 6, colors.secondary);
-  drawPixelRect(ctx, cx - 5 * p, cy + 6 * p, p * 10, p * 2, colors.secondary);
-  drawPixelRect(ctx, cx - 3 * p, cy + 8 * p, p * 6, p * 2, colors.secondary);
-
-  // 中心宝石
-  drawPixelRect(ctx, cx - 4 * p, cy, p * 8, p * 6, colors.primary);
-  drawPixelRect(ctx, cx - 3 * p, cy + p, p * 6, p * 4, colors.highlight);
-  drawPixelRect(ctx, cx - 2 * p, cy + 2 * p, p * 2, p * 2, '#ffffff');
-};
-
-// 像素风腰带
-const drawBelt: DrawFunction = (ctx, size, colors, p) => {
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // 腰带主体
-  drawPixelRect(ctx, cx - 12 * p, cy - 2 * p, p * 24, p * 4, '#8b5a2b');
-  drawPixelRect(ctx, cx - 12 * p, cy - p, p * 24, p * 2, '#a0522d');
-
-  // 腰带扣
-  drawPixelRect(ctx, cx - 4 * p, cy - 4 * p, p * 8, p * 8, colors.primary);
-  drawPixelRect(ctx, cx - 3 * p, cy - 3 * p, p * 6, p * 6, colors.secondary);
-  drawPixelRect(ctx, cx - 2 * p, cy - 2 * p, p * 4, p * 4, colors.highlight);
-
-  // 扣针
-  drawPixelRect(ctx, cx - p, cy - 3 * p, p * 2, p * 6, '#ffd700');
-
-  // 侧面装饰
-  drawPixelRect(ctx, cx - 10 * p, cy - p, p * 3, p * 2, colors.secondary);
-  drawPixelRect(ctx, cx + 7 * p, cy - p, p * 3, p * 2, colors.secondary);
-
-  // 腰带孔
-  drawPixel(ctx, cx + 5 * p, cy - p * 0.5, p, '#5a3a1a');
-  drawPixel(ctx, cx + 7 * p, cy - p * 0.5, p, '#5a3a1a');
-  drawPixel(ctx, cx + 9 * p, cy - p * 0.5, p, '#5a3a1a');
-};
-
-// 绘制函数映射
-const drawFunctions: Record<EquipmentType, DrawFunction> = {
-  sword: drawSword,
-  dagger: drawDagger,
-  axe: drawAxe,
-  hammer: drawHammer,
-  bow: drawBow,
-  staff: drawStaff,
-  spear: drawSpear,
-  shield: drawShield,
-  armor: drawArmor,
-  helmet: drawHelmet,
-  boots: drawBoots,
-  gloves: drawGloves,
-  cloak: drawCloak,
-  ring: drawRing,
-  amulet: drawAmulet,
-  belt: drawBelt,
-};
-
-export const EquipmentIcon = ({ type, quality = 'common', size = 48, className = '' }: EquipmentIconProps) => {
+export const EquipmentIcon = ({ type, quality = 'common', size = 48, className = '', seed }: EquipmentIconProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const colors = qualityColors[quality];
+
+  // Generate a stable seed if not provided, or rely on type + quality if no unique seed
+  const finalSeed = useMemo(() => {
+     if (seed) return stringToSeed(seed);
+     return stringToSeed(type + quality + (Math.random())); // Random if no seed
+  }, [type, quality, seed]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 支持高清屏
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    canvas.style.width = `${size}px`;
-    canvas.style.height = `${size}px`;
-    ctx.scale(dpr, dpr);
+    // Reset
+    ctx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
+    
+    // Setup RNG
+    const rand = mulberry32(finalSeed);
 
-    // 清空画布
-    ctx.clearRect(0, 0, size, size);
+    // Draw Base
+    const categories = {
+        weapon: ['sword', 'dagger', 'axe', 'hammer', 'bow', 'staff', 'spear'],
+        armor: ['shield', 'armor', 'helmet', 'boots', 'gloves', 'cloak'],
+        accessory: ['ring', 'amulet', 'belt']
+    };
 
-    // 关闭抗锯齿以获得像素风效果
-    ctx.imageSmoothingEnabled = false;
-
-    // 计算像素大小 - 基于 size 调整
-    const pixelSize = Math.max(1, Math.floor(size / 32));
-
-    // 绘制装备图标
-    const drawFn = drawFunctions[type];
-    if (drawFn) {
-      drawFn(ctx, size, colors, pixelSize);
+    if (categories.weapon.includes(type)) {
+        drawWeapon(ctx, type, quality, rand);
+    } else if (categories.armor.includes(type)) {
+        drawArmor(ctx, type, quality, rand);
+    } else {
+        drawAccessory(ctx, type, quality, rand);
     }
-  }, [type, quality, size, colors]);
+
+    // --- Post Processing ---
+
+    // 1. Outline (Black/Dark)
+    const outlineColor = getMaterialTier(quality, 'metal').outline;
+    outlineShape(ctx, GRID_SIZE, GRID_SIZE, outlineColor);
+
+    // 2. Rim Light (Source Atop)
+    // Only for Rare+
+    if (['rare', 'epic', 'legendary', 'mythic'].includes(quality)) {
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        // Draw a gradient or angled rect
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(GRID_SIZE, 0);
+        ctx.lineTo(0, GRID_SIZE);
+        ctx.fill();
+        
+        // Reset
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // 3. Glow for Mythic/Legendary
+    if (['legendary', 'mythic'].includes(quality)) {
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = PALETTE.quality[quality];
+        // Redraw outline to cast shadow
+        // Hacky way: draw image over itself with shadow
+        const temp = document.createElement('canvas');
+        temp.width = GRID_SIZE;
+        temp.height = GRID_SIZE;
+        temp.getContext('2d')?.drawImage(canvas, 0, 0);
+        ctx.drawImage(temp, 0, 0);
+        ctx.shadowBlur = 0;
+    }
+
+  }, [type, quality, finalSeed]);
 
   return (
     <canvas
       ref={canvasRef}
+      width={GRID_SIZE}
+      height={GRID_SIZE}
       className={className}
-      style={{ 
-        width: size, 
+      style={{
+        width: size,
         height: size,
-        imageRendering: 'pixelated',
+        imageRendering: 'pixelated', // Essential for crisp pixels
       }}
     />
   );
