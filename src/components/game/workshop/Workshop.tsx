@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RecipeSelector } from "./RecipeSelector";
 import { ForgingGame } from "./ForgingGame";
 import { ResultDialog } from "./ResultDialog";
+import { PixelBlacksmith } from "./PixelBlacksmith";
 import { useGameStore } from "@/store/gameStore";
 import { Recipe, Equipment, Quality } from "@/types/game";
 import { generateItemId, calculateQuality } from "@/store/gameStore";
@@ -161,23 +162,37 @@ export function Workshop() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recipe Selection */}
-        <Card className="overflow-hidden">
-          <CardHeader className="bg-muted/50 border-b-2 border-border pb-4">
-            <CardTitle className="flex items-center gap-2 text-foreground text-sm">
-              <GiFireBowl className="text-2xl text-orange-500" />
-              配方选择
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 bg-card/50">
-            <RecipeSelector
-              recipes={unlockedRecipes}
-              selectedRecipe={selectedRecipe}
-              onSelect={handleSelectRecipe}
-              disabled={isForging}
-            />
-          </CardContent>
-        </Card>
+        {/* Recipe Selection & Blacksmith */}
+        <div className="space-y-4">
+          <Card className="overflow-hidden">
+            <CardHeader className="bg-muted/50 border-b-2 border-border pb-4">
+              <CardTitle className="flex items-center gap-2 text-foreground text-sm">
+                <GiFireBowl className="text-2xl text-orange-500" />
+                配方选择
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 bg-card/50">
+              <RecipeSelector
+                recipes={unlockedRecipes}
+                selectedRecipe={selectedRecipe}
+                onSelect={handleSelectRecipe}
+                disabled={isForging}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Pixel Blacksmith */}
+          <Card className="overflow-hidden">
+            <CardHeader className="bg-muted/50 border-b-2 border-border pb-3">
+              <CardTitle className="text-foreground text-sm">
+                铁匠
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 bg-card/50 flex justify-center">
+              <PixelBlacksmith size={120} isForging={isForging} />
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Forging Area */}
         <Card className="overflow-hidden">
