@@ -7,6 +7,7 @@ import { Orders } from '@/components/game/orders/Orders';
 import { Inventory } from '@/components/game/inventory/Inventory';
 import { Exploration } from '@/components/game/exploration/Exploration';
 import { Upgrades } from '@/components/game/upgrades/Upgrades';
+import { NPCHiring } from '@/components/game/npc/NPCHiring';
 import { EventModal } from '@/components/game/events';
 
 export function GameLayout() {
@@ -22,6 +23,8 @@ export function GameLayout() {
         return <Inventory />;
       case 'exploration':
         return <Exploration />;
+      case 'npc':
+        return <NPCHiring />;
       case 'upgrades':
         return <Upgrades />;
       default:

@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { GameState, Equipment, Material, Order, Expedition, Quality, MaterialType, EventCard, ActiveEffect, EffectType } from '@/types/game';
+import { GameState, Equipment, Material, Order, Expedition, Quality, MaterialType, EventCard, ActiveEffect, EffectType, NPCQuality } from '@/types/game';
 import { initialRecipes } from '@/data/recipes';
 import { initialUpgrades } from '@/data/upgrades';
 import { getRandomCards, EVENT_INTERVAL } from '@/data/events';
+import { getRandomHiredNPC, hireCost } from '@/data/hiredNpcs';
 
 interface GameActions {
   addGold: (amount: number) => void;
@@ -31,9 +32,13 @@ interface GameActions {
   consumeEffect: (effectType: EffectType) => ActiveEffect | undefined;
   getActiveEffect: (effectType: EffectType) => ActiveEffect | undefined;
   hasActiveEffect: (effectType: EffectType) => boolean;
+  // NPC 雇佣系统方法
+  hireNPC: (quality: NPCQuality) => boolean;
+  fireNPC: (npcId: string) => void;
+  upgradeNPCExperience: (npcId: string) => void;
 }
 
-const GAME_VERSION = 2; // 增加版本号用于迁移
+const GAME_VERSION = 3; // 增加版本号用于迁移
 
 const initialState: GameState = {
   gold: 100,
@@ -59,6 +64,9 @@ const initialState: GameState = {
   eventCooldown: EVENT_INTERVAL,
   showEventModal: false,
   currentEventCards: [],
+  // NPC 雇佣系统初始状态
+  hiredNPCs: [],
+  maxHiredNPCs: 3,
   version: GAME_VERSION,
 };
 
@@ -337,28 +345,64 @@ export const useGameStore = create<GameState & GameActions>()(
         const state = get();
         return state.activeEffects.some((e) => e.effectType === effectType);
       },
+
+      hireNPC: (quality: NPCQuality) => {
+        const state = get();
+        const cost = hireCost[quality];
+
+        // 检查条件
+        if (state.hiredNPCs.length >= state.maxHiredNPCs) {
+          return false; // 已满员
+        }
+        if (state.gold < cost) {
+          return false; // 金币不足
+        }
+
+        // 随机生成 NPC
+        const newNPC = getRandomHiredNPC(quality);
+
+        set({
+          hiredNPCs: [...state.hiredNPCs, newNPC],
+          gold: state.gold - cost,
+        });
+        return true;
+      },
+
+      fireNPC: (npcId: string) => set((state) => ({
+        hiredNPCs: state.hiredNPCs.filter((npc) => npc.id !== npcId),
+      })),
+
+      upgradeNPCExperience: (npcId: string) => set((state) => ({
+        hiredNPCs: state.hiredNPCs.map((npc) => {
+          if (npc.id === npcId && npc.experienceLevel < 5) {
+            return { ...npc, experienceLevel: npc.experienceLevel + 1 };
+          }
+          return npc;
+        }),
+      })),
     }),
     {
       name: 'legendary-forge-save',
       // 版本迁移：如果存储的版本低于当前版本，自动重置为新的初始状态
-      migrate: (persistedState: any, version: number) => {
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as Partial<GameState> | undefined;
         if (version < GAME_VERSION) {
           // 保留一些玩家数据，但重置升级列表
           const migratedState = { ...initialState } as GameState & GameActions;
-          if (persistedState?.gold) {
-            migratedState.gold = Math.min(persistedState.gold, 100000); // 限制上限
+          if (state?.gold) {
+            migratedState.gold = Math.min(state.gold, 100000); // 限制上限
           }
-          if (persistedState?.reputation) {
-            migratedState.reputation = persistedState.reputation;
+          if (state?.reputation) {
+            migratedState.reputation = state.reputation;
           }
-          if (persistedState?.level) {
-            migratedState.level = persistedState.level;
+          if (state?.level) {
+            migratedState.level = state.level;
           }
-          if (persistedState?.day) {
-            migratedState.day = persistedState.day;
+          if (state?.day) {
+            migratedState.day = state.day;
           }
-          if (persistedState?.inventory) {
-            migratedState.inventory = persistedState.inventory;
+          if (state?.inventory) {
+            migratedState.inventory = state.inventory;
           }
           migratedState.version = GAME_VERSION;
           return migratedState;

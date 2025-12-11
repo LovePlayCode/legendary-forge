@@ -99,12 +99,38 @@ export interface Recipe {
 
 export type NPCProfession = 'knight' | 'mage' | 'villager' | 'merchant' | 'adventurer';
 
+export type NPCQuality = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+
+export type NPCBonus = 
+  | 'forgeSpeedBonus'      // 锻造速度加成
+  | 'qualityBoost'         // 品质提升
+  | 'materialSave'         // 材料节省
+  | 'orderRewardBoost'     // 订单报酬加成
+  | 'reputationBoost'      // 声望加成
+  | 'successRate'          // 成功率提升;
+
 export interface NPC {
   id: string;
   name: string;
   profession: NPCProfession;
   avatar: string;
   personality: string;
+  quality?: NPCQuality;      // NPC 品质（通常为雇佣后才有）
+  bonus?: NPCBonus;          // NPC 专长
+  bonusValue?: number;       // 加成数值（百分比或绝对值）
+  salary?: number;           // 月薪
+  hired?: boolean;           // 是否被雇佣
+  hiredAt?: number;          // 雇佣时间
+}
+
+export interface HiredNPC extends NPC {
+  hired: true;
+  quality: NPCQuality;
+  bonus: NPCBonus;
+  bonusValue: number;
+  salary: number;
+  hiredAt: number;
+  experienceLevel: number;   // 经验等级（1-5）
 }
 
 export interface Order {
@@ -201,6 +227,9 @@ export interface GameState {
   eventCooldown: number;        // 下次事件倒计时（秒）
   showEventModal: boolean;      // 是否显示事件弹窗
   currentEventCards: EventCard[]; // 当前可选卡片
+  // NPC 雇佣系统
+  hiredNPCs: HiredNPC[];        // 已雇佣的 NPC 列表
+  maxHiredNPCs: number;         // 最多能雇佣的 NPC 数量
   // 版本控制
   version?: number;
 }
