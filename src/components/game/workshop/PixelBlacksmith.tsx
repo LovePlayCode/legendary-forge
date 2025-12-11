@@ -6,20 +6,63 @@ interface PixelBlacksmithProps {
   className?: string;
 }
 
+// 扩展的高级色板
+const PALETTE = {
+  skin: {
+    base: '#d4a574',
+    shadow: '#a06a38',
+    darkShadow: '#6e3b15', // 深层阴影
+    highlight: '#eacbb8',
+    rim: '#fff0e5', // 边缘光
+  },
+  hair: {
+    base: '#4a3c31',
+    shadow: '#2a1d15',
+    highlight: '#6b5a4a',
+  },
+  clothes: {
+    base: '#3a4a5e',
+    shadow: '#1e2836',
+    highlight: '#526680',
+    dirty: '#2a3644', // 污渍色
+  },
+  apron: {
+    base: '#8b5a2b',
+    shadow: '#5e3a17',
+    highlight: '#b37840',
+    worn: '#6e4420', // 磨损
+    stitch: '#d4a574', // 缝线
+  },
+  metal: {
+    base: '#71797e',
+    shadow: '#4a4e52',
+    highlight: '#b2b6b9',
+    shine: '#eef2f3',
+    rune: '#00ffff', // 符文光
+    runeDim: '#008b8b',
+  },
+  fire: {
+    base: '#ff4500',
+    mid: '#ff8c00',
+    core: '#ffff00',
+  }
+};
+
 export const PixelBlacksmith = ({ size = 120, isForging = false, className = '' }: PixelBlacksmithProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [frame, setFrame] = useState(0);
   const animationRef = useRef<number>();
+  const particlesRef = useRef<{x: number, y: number, vx: number, vy: number, life: number, type: 'spark' | 'smoke' | 'rune'}[]>([]);
 
   useEffect(() => {
-    // 动画帧循环 - 增加帧数实现更平滑的动画
-    const fps = isForging ? 12 : 8; // 锻造时更快更流畅
+    // 增加动画帧率以获得流畅感
+    const fps = isForging ? 18 : 8; 
     const interval = 1000 / fps;
     let lastTime = 0;
 
     const animate = (time: number) => {
       if (time - lastTime >= interval) {
-        setFrame((f) => (f + 1) % 8);
+        setFrame((f) => (f + 1) % 24); // 24帧循环，更细腻的动作
         lastTime = time;
       }
       animationRef.current = requestAnimationFrame(animate);
@@ -37,265 +80,345 @@ export const PixelBlacksmith = ({ size = 120, isForging = false, className = '' 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 支持高清屏
     const dpr = window.devicePixelRatio || 1;
+    // 使用 64x64 的超高精度像素网格 (原来是 32x32)
+    const GRID = 64; 
+    
     canvas.width = size * dpr;
     canvas.height = size * dpr;
     canvas.style.width = `${size}px`;
     canvas.style.height = `${size}px`;
-    ctx.scale(dpr, dpr);
-
-    // 关闭抗锯齿
+    
+    ctx.scale(dpr * (size / GRID), dpr * (size / GRID));
     ctx.imageSmoothingEnabled = false;
 
-    // 清空画布
-    ctx.clearRect(0, 0, size, size);
+    // 清空
+    ctx.clearRect(0, 0, GRID, GRID);
 
-    // 像素大小
-    const p = Math.max(1, Math.floor(size / 40));
-    const cx = size / 2;
-    const cy = size / 2;
-
-    // 辅助函数
-    const drawPixelRect = (x: number, y: number, w: number, h: number, color: string) => {
+    // ================== 绘图工具 ==================
+    const rect = (x: number, y: number, w: number, h: number, color: string) => {
       ctx.fillStyle = color;
-      ctx.fillRect(Math.floor(x), Math.floor(y), w, h);
+      ctx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(w), Math.ceil(h));
+    };
+    
+    // 绘制单个精细像素
+    const dot = (x: number, y: number, color: string) => {
+      rect(x, y, 1, 1, color);
     };
 
-    // 使用缓动函数计算流畅的动画偏移
-    // frame 0-3: 上升，frame 4-7: 下落
-    const normalizedFrame = frame % 8;
-    
-    // 三角形波形 - 上升和下落
-    let easeProgress: number;
-    if (normalizedFrame < 4) {
-      // 上升 - 缓出
-      easeProgress = normalizedFrame / 4;
-      easeProgress = 1 - Math.pow(1 - easeProgress, 3);
-    } else {
-      // 下落 - 缓入
-      easeProgress = (normalizedFrame - 4) / 4;
-      easeProgress = Math.pow(easeProgress, 2);
-    }
-    
-    // 最大偏移距离
-    const maxHammerOffset = -5 * p;
-    const maxArmOffset = -3 * p;
-    const maxBodyOffset = -1 * p;
-    
-    const hammerOffset = normalizedFrame < 4 ? maxHammerOffset * easeProgress : maxHammerOffset * (1 - easeProgress);
-    const armOffset = normalizedFrame < 4 ? maxArmOffset * easeProgress : maxArmOffset * (1 - easeProgress);
-    const bodyOffset = normalizedFrame < 4 ? maxBodyOffset * easeProgress * 0.5 : maxBodyOffset * (1 - easeProgress) * 0.5;
-    
-    // 火花在敲打时（中间两帧）显示
-    const sparkFrame = normalizedFrame === 3 || normalizedFrame === 7;
-
-    // ===== 绘制铁砧 =====
-    // 铁砧底座
-    drawPixelRect(cx - 12 * p, cy + 14 * p, p * 24, p * 6, '#4a4a4a');
-    drawPixelRect(cx - 10 * p, cy + 13 * p, p * 20, p, '#5a5a5a');
-    drawPixelRect(cx - 10 * p, cy + 12 * p, p * 20, p, '#6a6a6a');
-    // 铁砧主体
-    drawPixelRect(cx - 8 * p, cy + 8 * p, p * 16, p * 4, '#6a6a6a');
-    drawPixelRect(cx - 7 * p, cy + 7 * p, p * 14, p, '#7a7a7a');
-    drawPixelRect(cx - 7 * p, cy + 5 * p, p * 14, p * 2, '#8a8a8a');
-    // 铁砧顶部工作面
-    drawPixelRect(cx - 6 * p, cy + 5 * p, p * 12, p * 2, '#9a9a9a');
-    drawPixelRect(cx - 5 * p, cy + 4 * p, p * 10, p, '#aaaaaa');
-    // 铁砧高光（顶部）
-    drawPixelRect(cx - 4 * p, cy + 5 * p, p * 3, p, '#c0c0c0');
-    drawPixelRect(cx - 2 * p, cy + 6 * p, p, p, '#e0e0e0');
-    // 铁砧角部
-    drawPixelRect(cx - 10 * p, cy + 10 * p, p * 3, p * 2, '#5a5a5a');
-    drawPixelRect(cx + 7 * p, cy + 10 * p, p * 3, p * 2, '#5a5a5a');
-    // 铁砧烙印（凹陷）
-    drawPixelRect(cx - 3 * p, cy + 6 * p, p * 2, p, '#7a7a7a');
-    drawPixelRect(cx + p, cy + 7 * p, p * 2, p, '#7a7a7a');
-
-    // ===== 绘制正在锻造的装备（剑） =====
-    if (isForging) {
-      // 发光的剑坯 - 更生动
-      drawPixelRect(cx - 2 * p, cy + 1 * p, p * 4, p * 4, '#ff3300');
-      drawPixelRect(cx - p, cy, p * 2, p * 6, '#ff6600');
-      drawPixelRect(cx - p * 0.5, cy + p, p, p * 5, '#ffcc00');
-      // 冒烟
-      drawPixelRect(cx - 3 * p, cy - 2 * p, p, p, '#ffaa00');
-      drawPixelRect(cx + 2 * p, cy - 3 * p, p, p, '#ffaa00');
-    } else {
-      // 冷却的剑 - 灰色
-      drawPixelRect(cx - p, cy + 1 * p, p * 2, p * 5, '#a0a0a0');
-      drawPixelRect(cx - p * 0.5, cy + 1 * p, p, p * 5, '#c0c0c0');
-      // 冷却剑的描边
-      drawPixelRect(cx - 2 * p, cy + 2 * p, p, p * 3, '#808080');
-      drawPixelRect(cx + p, cy + 2 * p, p, p * 3, '#808080');
-    }
-
-    // ===== 绘制铁匠身体 =====
-    // 腿部 - 更细致（轻微摇晃）
-    const legOffset = bodyOffset * 0.3;
-    drawPixelRect(cx - 18 * p + legOffset, cy + 10 * p, p * 4, p * 8, '#5a4a3a');
-    drawPixelRect(cx - 14 * p + legOffset, cy + 10 * p, p * 4, p * 8, '#5a4a3a');
-    // 腿部高光
-    drawPixelRect(cx - 17 * p + legOffset, cy + 10 * p, p, p * 8, '#6a5a4a');
-    drawPixelRect(cx - 13 * p + legOffset, cy + 10 * p, p, p * 8, '#6a5a4a');
-    // 靴子 - 更大
-    drawPixelRect(cx - 19 * p + legOffset, cy + 18 * p, p * 6, p * 3, '#2a1a0a');
-    drawPixelRect(cx - 15 * p + legOffset, cy + 18 * p, p * 6, p * 3, '#2a1a0a');
-    // 靴子高光
-    drawPixelRect(cx - 18 * p + legOffset, cy + 18 * p, p, p * 3, '#4a3a2a');
-    drawPixelRect(cx - 14 * p + legOffset, cy + 18 * p, p, p * 3, '#4a3a2a');
-
-    // 身体底层（肌肤色）- 摇晃
-    drawPixelRect(cx - 20 * p + bodyOffset, cy - 2 * p + bodyOffset, p * 12, p * 12, '#d4a574');
-    // 身体（工作服 - 深棕）
-    drawPixelRect(cx - 20 * p + bodyOffset, cy - 4 * p + bodyOffset, p * 12, p * 14, '#6b4423');
-    drawPixelRect(cx - 19 * p + bodyOffset, cy - 3 * p + bodyOffset, p * 10, p * 12, '#8b5a2b');
-    // 服装褶皱
-    drawPixelRect(cx - 20 * p + bodyOffset, cy - p + bodyOffset, p * 12, p, '#5a3a1a');
-    drawPixelRect(cx - 20 * p + bodyOffset, cy + 4 * p + bodyOffset, p * 12, p, '#5a3a1a');
-    // 围裙 - 黄棕色
-    drawPixelRect(cx - 18 * p + bodyOffset, cy + bodyOffset, p * 8, p * 12, '#c9b896');
-    drawPixelRect(cx - 18 * p + bodyOffset, cy + bodyOffset, p * 8, p, '#d4a574');
-    // 围裙口袋
-    drawPixelRect(cx - 14 * p + bodyOffset, cy + 4 * p + bodyOffset, p * 3, p * 3, '#a08050');
-    drawPixelRect(cx - 10 * p + bodyOffset, cy + 4 * p + bodyOffset, p * 3, p * 3, '#a08050');
-    // 围裙带 - 绳子
-    drawPixelRect(cx - 20 * p + bodyOffset, cy - 5 * p + bodyOffset, p * 12, p * 2, '#654321');
-    drawPixelRect(cx - 20 * p + bodyOffset, cy - 4 * p + bodyOffset, p, p * 2, '#3a2a1a');
-    drawPixelRect(cx - 9 * p + bodyOffset, cy - 4 * p + bodyOffset, p, p * 2, '#3a2a1a');
-
-    // 头部微动（更生动的表现）
-    const headBobOffset = bodyOffset * 1.2;
-    const headTiltOffset = normalizedFrame < 4 ? (normalizedFrame / 4) * p * 0.5 : ((8 - normalizedFrame) / 4) * p * 0.5;
-    
-    drawPixelRect(cx - 18 * p + headTiltOffset, cy - 14 * p + headBobOffset, p * 8, p * 10, '#d4a574');
-    // 头部轮廓
-    drawPixelRect(cx - 19 * p + headTiltOffset, cy - 13 * p + headBobOffset, p, p * 8, '#b8944a');
-    drawPixelRect(cx - 10 * p + headTiltOffset, cy - 13 * p + headBobOffset, p, p * 8, '#b8944a');
-    // 头发/帽子 - 黑色毛发
-    drawPixelRect(cx - 19 * p + headTiltOffset, cy - 16 * p + headBobOffset, p * 10, p * 4, '#2a1a0a');
-    drawPixelRect(cx - 18 * p + headTiltOffset, cy - 14 * p + headBobOffset, p * 2, p * 4, '#2a1a0a');
-    drawPixelRect(cx - 9 * p + headTiltOffset, cy - 14 * p + headBobOffset, p * 2, p * 4, '#2a1a0a');
-    // 帽子细节 - 工作帽
-    drawPixelRect(cx - 17 * p + headTiltOffset, cy - 17 * p + headBobOffset, p * 6, p * 2, '#3a2a1a');
-
-    // 眼睛 - 两只眼睛
-    drawPixelRect(cx - 16 * p + headTiltOffset, cy - 10 * p + headBobOffset, p * 2, p * 2, '#2a2a2a');
-    drawPixelRect(cx - 12 * p + headTiltOffset, cy - 10 * p + headBobOffset, p * 2, p * 2, '#2a2a2a');
-    // 眼睛高光 - 显示专注
-    drawPixelRect(cx - 15 * p + headTiltOffset, cy - 9 * p + headBobOffset, p, p, '#ffffff');
-    drawPixelRect(cx - 11 * p + headTiltOffset, cy - 9 * p + headBobOffset, p, p, '#ffffff');
-    // 眉毛
-    drawPixelRect(cx - 16 * p + headTiltOffset, cy - 12 * p + headBobOffset, p * 2, p, '#1a0a0a');
-    drawPixelRect(cx - 12 * p + headTiltOffset, cy - 12 * p + headBobOffset, p * 2, p, '#1a0a0a');
-
-    // 鼻子
-    drawPixelRect(cx - 14 * p + headTiltOffset, cy - 8 * p + headBobOffset, p * 2, p * 2, '#c49860');
-
-    // 胡子 - 更蓬松
-    drawPixelRect(cx - 16 * p + headTiltOffset, cy - 6 * p + headBobOffset, p * 2, p * 2, '#5a4a3a');
-    drawPixelRect(cx - 13 * p + headTiltOffset, cy - 6 * p + headBobOffset, p * 2, p * 2, '#5a4a3a');
-    drawPixelRect(cx - 16 * p + headTiltOffset, cy - 5 * p + headBobOffset, p * 4, p * 2, '#6a5a4a');
-    drawPixelRect(cx - 15 * p + headTiltOffset, cy - 4 * p + headBobOffset, p * 2, p, '#5a4a3a');
-    drawPixelRect(cx - 12 * p + headTiltOffset, cy - 4 * p + headBobOffset, p * 2, p, '#5a4a3a');
-
-    // ===== 绘制手臂和锤子 =====
-    // 肩膀（跟随身体摇晃）
-    drawPixelRect(cx - 21 * p + bodyOffset, cy - 2 * p + bodyOffset, p * 3, p * 4, '#8b5a2b');
-    drawPixelRect(cx - 10 * p + bodyOffset, cy - 2 * p + bodyOffset, p * 3, p * 4, '#8b5a2b');
-
-    // 后手臂（固定）- 更长更粗
-    drawPixelRect(cx - 20 * p + bodyOffset, cy - 2 * p + bodyOffset, p * 8, p * 4, '#d4a574');
-    drawPixelRect(cx - 19 * p + bodyOffset, cy - 2 * p + bodyOffset, p * 2, p * 4, '#b8944a');
-    // 手
-    drawPixelRect(cx - 13 * p + bodyOffset, cy - p + bodyOffset, p * 2, p * 3, '#d4a574');
-
-    // 前手臂（动画）- 流畅的摆动
-    const armY = cy - 8 * p + armOffset + bodyOffset;
-    drawPixelRect(cx - 14 * p + bodyOffset, armY, p * 8, p * 4, '#d4a574');
-    drawPixelRect(cx - 13 * p + bodyOffset, armY, p * 2, p * 4, '#b8944a');
-    // 手
-    drawPixelRect(cx - 15 * p + bodyOffset, armY - 3 * p, p * 2, p * 3, '#d4a574');
-
-    // 锤子（动画）- 流畅的摆动
-    const hammerY = cy - 14 * p + hammerOffset;
-    // 锤柄 - 木质
-    drawPixelRect(cx - 6 * p, hammerY, p * 2, p * 14, '#8b5a2b');
-    drawPixelRect(cx - 5 * p, hammerY, p, p * 14, '#a0522d');
-    // 锤柄缠绕
-    drawPixelRect(cx - 6 * p, hammerY + 4 * p, p * 2, p * 2, '#654321');
-    drawPixelRect(cx - 6 * p, hammerY + 9 * p, p * 2, p * 2, '#654321');
-    // 锤头 - 金属（更大的敲打感）
-    const hammerHeadSize = normalizedFrame < 4 ? p * 12 + p * 2 * easeProgress : p * 12 + p * 2 * (1 - easeProgress);
-    drawPixelRect(cx - 11 * p, hammerY - 4 * p, hammerHeadSize, p * 4, '#5a5a5a');
-    drawPixelRect(cx - 10 * p, hammerY - 3 * p, hammerHeadSize - p * 2, p * 2, '#7a7a7a');
-    drawPixelRect(cx - 9 * p, hammerY - 1 * p, hammerHeadSize - p * 4, p * 2, '#9a9a9a');
-    // 锤头高光 - 反光面
-    drawPixelRect(cx - 8 * p, hammerY - 3 * p, p * 3, p, '#d0d0d0');
-    drawPixelRect(cx - 7 * p, hammerY - 2 * p, p, p, '#ffffff');
-    // 锤头底部装饰带
-    drawPixelRect(cx - 10 * p, hammerY + 2 * p, hammerHeadSize - p * 2, p, '#ffc700');
-
-    // ===== 绘制火花（锻造时） =====
-    if (isForging && sparkFrame) {
-      const sparkColors = ['#ffff00', '#ff9900', '#ff6600', '#ffffff', '#ffcc00'];
-      // 随机火花 - 更多
-      for (let i = 0; i < 8; i++) {
-        const sx = cx + (Math.random() - 0.5) * 20 * p;
-        const sy = cy + (Math.random() - 0.5) * 12 * p;
-        const color = sparkColors[Math.floor(Math.random() * sparkColors.length)];
-        const size = Math.random() > 0.5 ? p : p * 0.5;
-        drawPixelRect(sx, sy, size, size, color);
+    // 绘制杂色/纹理
+    const dither = (x: number, y: number, w: number, h: number, color: string, density: number) => {
+      ctx.fillStyle = color;
+      for(let i=0; i<w; i++) {
+        for(let j=0; j<h; j++) {
+          if ((i + j) % density === 0) rect(x+i, y+j, 1, 1, color);
+        }
       }
-      // 密集火花环
-      drawPixelRect(cx + 5 * p, cy - 1 * p, p, p, '#ffff00');
-      drawPixelRect(cx + 7 * p, cy + 2 * p, p, p, '#ff9900');
-      drawPixelRect(cx - 5 * p, cy - 2 * p, p, p, '#ffffff');
-      drawPixelRect(cx + 2 * p, cy - 5 * p, p, p, '#ff6600');
-      drawPixelRect(cx - 2 * p, cy + 4 * p, p, p, '#ffcc00');
-      drawPixelRect(cx + 8 * p, cy - 3 * p, p * 0.5, p * 0.5, '#ffff00');
-      drawPixelRect(cx - 6 * p, cy + 3 * p, p * 0.5, p * 0.5, '#ffffff');
+    };
+
+    // ================== 动画状态机 (24帧) ==================
+    // 0-6: 举起 (慢)
+    // 7-10: 蓄力 (顶峰悬停)
+    // 11: 猛击 (极快)
+    // 12-14: 挤压 (落地变形)
+    // 15-23: 恢复 (慢)
+
+    let bodyY = 0;
+    let hammerAngle = 0;
+    
+    if (isForging) {
+      if (frame <= 6) { // 举起
+        const t = frame / 6;
+        hammerAngle = -Math.PI/2 * t; // 举到90度
+        bodyY = -1 * t;
+      } else if (frame <= 10) { // 蓄力
+        const t = (frame - 6) / 4;
+        hammerAngle = -Math.PI/2 - 0.5 * t; // 向后多蓄力一点
+        bodyY = -1 - 0.5 * t; // 身体后仰
+      } else if (frame === 11) { // 猛击
+        hammerAngle = 0.2; // 稍微过头一点
+        bodyY = 3; // 身体猛烈下沉
+      } else if (frame <= 14) { // 缓冲
+        hammerAngle = 0;
+        bodyY = 2;
+      } else { // 恢复
+        const t = (frame - 15) / 9;
+        hammerAngle = 0;
+        bodyY = 2 * (1 - t);
+      }
+    } else {
+      // 细腻的呼吸动画
+      bodyY = Math.sin(frame / 24 * Math.PI * 2) * 0.8;
+      hammerAngle = Math.PI / 8; // 锤子杵在地上
     }
 
-    // ===== 绘制火炉（背景） =====
-    // 火炉底座 - 石头
-    drawPixelRect(cx + 10 * p, cy + 6 * p, p * 10, p * 14, '#4a3a2a');
-    drawPixelRect(cx + 11 * p, cy + 7 * p, p * 8, p * 12, '#3a2a1a');
-    // 石头纹理
-    drawPixelRect(cx + 12 * p, cy + 8 * p, p * 2, p * 2, '#2a1a0a');
-    drawPixelRect(cx + 15 * p, cy + 10 * p, p * 2, p * 2, '#2a1a0a');
-    drawPixelRect(cx + 12 * p, cy + 14 * p, p * 2, p * 2, '#2a1a0a');
-    // 火炉门 - 黑色
-    drawPixelRect(cx + 12 * p, cy + 8 * p, p * 6, p * 8, '#1a1a1a');
-    drawPixelRect(cx + 13 * p, cy + 9 * p, p * 4, p * 6, '#0a0a0a');
-    // 火炉门边框
-    drawPixelRect(cx + 12 * p, cy + 8 * p, p * 6, p, '#5a4a3a');
-    drawPixelRect(cx + 12 * p, cy + 15 * p, p * 6, p, '#5a4a3a');
-
-    // 火焰 - 随动画帧波动（更生动的节奏感）
-    const fireIntensity = normalizedFrame < 4 ? easeProgress : 1 - easeProgress;
-    const fireHeight = p * 6 + p * 2 * fireIntensity;
+    // ================== 1. 背景层：精细的火炉 ==================
+    // 墙壁纹理
+    rect(40, 20, 24, 44, '#2d241b'); // 暗部背景
+    dither(40, 20, 24, 44, '#3e3226', 3); // 砖块质感
     
-    drawPixelRect(cx + 12 * p + p * fireIntensity, cy + 9 * p - p * fireIntensity, p * 4 + p * fireIntensity, p * 4, '#ff3300');
-    drawPixelRect(cx + 13 * p + p * fireIntensity * 0.5, cy + 7 * p - p * fireIntensity * 0.5, p * 2 + p * fireIntensity * 0.5, fireHeight, '#ff6600');
-    drawPixelRect(cx + 14 * p, cy + 8 * p - p * fireIntensity * 0.3, p, fireHeight * 0.8, '#ffcc00');
-    drawPixelRect(cx + 13 * p + p * fireIntensity * 0.5, cy + 6 * p - p * fireIntensity, p * 2, p * 2 + p * fireIntensity, '#ff9933');
+    // 炉膛
+    rect(44, 34, 16, 20, '#1a1008'); // 黑洞
+    // 炉膛边缘的高光
+    rect(43, 33, 18, 1, '#5e4b35');
+    
+    // 火焰核心 (动态)
+    const fireH = 2 + Math.random() * 3;
+    rect(46, 48 - fireH, 12, fireH + 6, PALETTE.fire.base);
+    rect(48, 50 - fireH, 8, fireH + 4, PALETTE.fire.mid);
+    rect(50, 52 - fireH, 4, fireH + 2, PALETTE.fire.core);
+    
+    // 铁砧 (更立体)
+    const ax = 10;
+    const ay = 46;
+    rect(ax, ay, 20, 18, '#2c2c2c'); // 底座深色
+    rect(ax+2, ay-2, 16, 4, '#3d3d3d'); // 中段
+    rect(ax, ay-6, 20, 4, '#4a4a4a'); // 顶部侧面
+    rect(ax, ay-8, 20, 2, '#666666'); // 顶部亮面
+    dot(ax+2, ay-7, '#888888'); // 顶部高光点
+    dot(ax+18, ay-7, '#888888');
+    
+    // 剑胚 (发光特效)
+    if (isForging) {
+      const glow = frame === 11 ? 2 : (frame > 6 && frame < 11 ? 1 : 0); // 击打时闪光
+      rect(ax+4, ay-10, 14, 2, frame === 11 ? '#ffffff' : '#ffaa00');
+      // 辉光晕
+      if (glow) {
+        ctx.fillStyle = `rgba(255, 200, 0, 0.3)`;
+        ctx.fillRect(ax+2, ay-12, 18, 6);
+      }
+    } else {
+      rect(ax+4, ay-10, 14, 2, '#5a6169'); // 冷铁
+    }
 
-    // 烟囱
-    drawPixelRect(cx + 13 * p, cy - 2 * p, p * 4, p * 8, '#5a4a3a');
-    drawPixelRect(cx + 14 * p, cy - 2 * p, p * 2, p * 8, '#4a3a2a');
-    // 烟囱边框
-    drawPixelRect(cx + 13 * p, cy - 3 * p, p * 4, p, '#3a2a1a');
+    // ================== 2. 角色绘制 (微像素级) ==================
+    const cx = 28; // 角色中心
+    const cy = 34 + bodyY; // 角色基准Y
+    
+    // 阴影投射 (脚底)
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(cx, 60, 12, 3, 0, 0, Math.PI*2);
+    ctx.fill();
 
-    // 烟雾 - 更平滑的飘动效果
-    const smokeWave = Math.sin((frame * Math.PI) / 4) * p;
-    drawPixelRect(cx + 14 * p + smokeWave, cy - 5 * p - frame * p * 0.3, p * 2, p * 2, '#808080');
-    drawPixelRect(cx + 13 * p - smokeWave * 0.5, cy - 8 * p - frame * p * 0.4, p * 2, p * 2, '#a0a0a0');
-    drawPixelRect(cx + 15 * p + smokeWave * 0.3, cy - 10 * p - frame * p * 0.5, p, p, '#c0c0c0');
+    // --- 后腿 (右) ---
+    rect(cx+2, cy+20, 5, 12, PALETTE.clothes.shadow);
+    rect(cx+2, cy+32, 6, 3, '#111'); // 鞋
+
+    // --- 身体 (躯干) ---
+    // 衣服底色
+    rect(cx-8, cy, 14, 22, PALETTE.clothes.base);
+    // 肌肉轮廓 (衣服下的)
+    rect(cx-8, cy+2, 2, 8, PALETTE.clothes.shadow); // 侧腹阴影
+    
+    // --- 围裙 (充满细节) ---
+    rect(cx-7, cy+4, 12, 18, PALETTE.apron.base);
+    // 围裙磨损
+    dot(cx-2, cy+10, PALETTE.apron.worn);
+    dot(cx+2, cy+15, PALETTE.apron.worn);
+    dither(cx-7, cy+18, 12, 4, PALETTE.apron.shadow, 2); // 底部脏污
+    // 围裙带子
+    rect(cx-7, cy-2, 2, 6, PALETTE.apron.shadow);
+    rect(cx+3, cy-2, 2, 6, PALETTE.apron.shadow);
+    // 口袋
+    rect(cx-5, cy+12, 4, 4, PALETTE.apron.highlight);
+    
+    // --- 头部 (精修) ---
+    const hx = cx - 2;
+    const hy = cy - 8;
+    
+    // 脖子
+    rect(hx+1, hy+6, 4, 2, PALETTE.skin.shadow);
+    
+    // 脸部轮廓
+    rect(hx-2, hy, 10, 9, PALETTE.skin.base);
+    // 脸部阴影 (立体感)
+    rect(hx-2, hy+1, 1, 8, PALETTE.skin.shadow); 
+    rect(hx+7, hy+1, 1, 8, PALETTE.skin.shadow);
+    rect(hx-1, hy+8, 8, 1, PALETTE.skin.shadow); // 下巴阴影
+    
+    // 胡子 (大胡子)
+    rect(hx-3, hy+5, 12, 5, PALETTE.hair.base);
+    rect(hx-1, hy+9, 8, 2, PALETTE.hair.base); // 胡子尖
+    // 胡子杂色/高光
+    dot(hx, hy+6, PALETTE.hair.highlight);
+    dot(hx+4, hy+6, PALETTE.hair.highlight);
+    
+    // 眼睛 (有神)
+    if (isForging && frame === 11) {
+       // 用力闭眼
+       rect(hx, hy+3, 3, 1, PALETTE.skin.darkShadow);
+       rect(hx+5, hy+3, 3, 1, PALETTE.skin.darkShadow);
+    } else {
+       // 睁眼
+       rect(hx, hy+3, 2, 2, '#111');
+       rect(hx+5, hy+3, 2, 2, '#111');
+       dot(hx, hy+3, '#fff'); // 眼神光
+       dot(hx+5, hy+3, '#fff');
+    }
+    
+    // 眉毛
+    rect(hx-1, hy+1, 4, 1, PALETTE.hair.shadow);
+    rect(hx+4, hy+1, 4, 1, PALETTE.hair.shadow);
+    
+    // 头巾/头发
+    rect(hx-3, hy-2, 12, 4, '#8b0000'); // 红色头巾
+    rect(hx+7, hy, 2, 6, '#8b0000'); // 头巾飘带
+    // 头巾纹理
+    dither(hx-3, hy-2, 12, 4, '#5c0000', 3);
+
+    // --- 前腿 (左) ---
+    rect(cx-6, cy+20, 5, 12, PALETTE.clothes.base);
+    // 裤子褶皱
+    rect(cx-6, cy+20, 5, 2, PALETTE.clothes.shadow); 
+    rect(cx-7, cy+32, 6, 3, '#111'); // 鞋
+
+    // --- 手臂系统 (像素级肌肉) ---
+    // 肩膀
+    const sx = cx - 5;
+    const sy = cy + 2;
+    // 肌肉肩膀
+    rect(sx-2, sy-2, 6, 6, PALETTE.skin.base);
+    dot(sx, sy, PALETTE.skin.highlight); // 三角肌高光
+    
+    // 手臂动力学
+    let ex, ey, hdx, hdy; // Elbow, Hand
+    
+    if (isForging) {
+        // 使用更精确的关节位置
+        if (frame <= 6) { // 举起
+            const t = frame / 6;
+            ex = sx - 4 * t; ey = sy - 4 * t;
+            hdx = sx + 2 * t; hdy = sy - 10 * t;
+        } else if (frame <= 10) { // 蓄力
+            ex = sx - 6; ey = sy - 6;
+            hdx = sx + 4; hdy = sy - 14;
+        } else if (frame === 11) { // 猛击
+            ex = sx - 2; ey = sy + 4;
+            hdx = sx + 4; hdy = sy + 8;
+        } else { // 缓冲/恢复
+            const t = frame <= 14 ? 0 : (frame - 15) / 9;
+            ex = sx - 2 * (1-t); ey = sy + 4 * (1-t);
+            hdx = sx + 4 * (1-t); hdy = sy + 8 * (1-t);
+        }
+    } else {
+        // 闲置
+        ex = sx - 2; ey = sy + 4;
+        hdx = sx - 2; hdy = sy + 8;
+    }
+
+    // 绘制手臂 (用圆角矩形模拟肌肉)
+    // 上臂
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = PALETTE.skin.base;
+    ctx.beginPath();
+    ctx.moveTo(sx + 2, sy + 2);
+    ctx.lineTo(ex + 2, ey + 2);
+    ctx.stroke();
+    
+    // 前臂 (更粗壮)
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(ex + 2, ey + 2);
+    ctx.lineTo(hdx + 2, hdy + 2);
+    ctx.stroke();
+    
+    // 手套/手
+    rect(hdx, hdy, 5, 5, PALETTE.clothes.shadow); // 深色手套
+
+    // --- 传奇之锤 (细节拉满) ---
+    ctx.save();
+    ctx.translate(hdx + 2, hdy + 2);
+    ctx.rotate(hammerAngle);
+    
+    // 锤柄
+    rect(-2, -2, 4, 16, '#4a3c31'); // 木柄
+    dither(-2, -2, 4, 16, '#2a1d15', 3); // 木纹
+    // 锤柄缠绕
+    rect(-2, 8, 4, 4, '#8b5a2b'); 
+    
+    // 锤头 (更复杂的形状)
+    const hammerColor = isForging && frame > 6 && frame < 11 ? '#8a9bb0' : PALETTE.metal.base; // 蓄力时锤头因能量轻微变亮
+    
+    // 主体
+    rect(-6, -8, 12, 8, hammerColor);
+    // 亮面
+    rect(-5, -7, 10, 2, PALETTE.metal.highlight);
+    rect(-6, -8, 2, 8, PALETTE.metal.shadow); // 侧面阴影
+    
+    // 符文 (发光)
+    if (isForging) {
+       ctx.fillStyle = frame % 2 === 0 ? PALETTE.metal.rune : PALETTE.metal.runeDim;
+       rect(-2, -6, 4, 4, ctx.fillStyle);
+       // 符文辉光
+       ctx.shadowColor = PALETTE.metal.rune;
+       ctx.shadowBlur = 5;
+       ctx.fillRect(-1, -5, 2, 2);
+       ctx.shadowBlur = 0;
+    } else {
+       rect(-2, -6, 4, 4, '#4a4e52'); // 暗淡符文
+    }
+    
+    ctx.restore();
+
+    // ================== 3. 光照与特效 (后期处理) ==================
+    
+    // 边缘光 (Rim Light) - 来自火炉的橙光
+    // 简单模拟：在右侧边缘叠加亮橙色
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = 'rgba(255, 100, 0, 0.2)';
+    ctx.fillRect(cx, cy-10, 16, 50); // 照亮右半身
+    ctx.globalCompositeOperation = 'source-over';
+
+    // 粒子系统
+    if (isForging && frame === 11) {
+       // 猛击产生大量火花
+       for(let i=0; i<8; i++) {
+           particlesRef.current.push({
+               x: ax + 10, 
+               y: ay - 2,
+               vx: (Math.random() - 0.5) * 4,
+               vy: -(Math.random() * 4 + 2),
+               life: 1.0,
+               type: 'spark'
+           });
+       }
+    }
+    
+    // 符文碎片 (蓄力时掉落)
+    if (isForging && frame === 9 && Math.random() > 0.5) {
+        particlesRef.current.push({
+            x: hdx + 10,
+            y: hdy - 10,
+            vx: (Math.random() - 0.5),
+            vy: 0.5,
+            life: 0.8,
+            type: 'rune'
+        });
+    }
+
+    // 更新粒子
+    particlesRef.current = particlesRef.current.filter(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.05;
+        
+        if (p.type === 'spark') {
+            p.vy += 0.2; // 重力
+            if (p.y >= 50) p.vy *= -0.6; // 反弹
+            ctx.fillStyle = `rgba(255, 200, 0, ${p.life})`;
+            ctx.fillRect(p.x, p.y, 1.5, 1.5);
+        } else if (p.type === 'rune') {
+            ctx.fillStyle = `rgba(0, 255, 255, ${p.life})`;
+            ctx.fillRect(p.x, p.y, 1, 1);
+        }
+        
+        return p.life > 0;
+    });
 
   }, [size, frame, isForging]);
 
