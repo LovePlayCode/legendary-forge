@@ -5,6 +5,7 @@ import { RecipeSelector } from "./RecipeSelector";
 import { ForgingGame } from "./ForgingGame";
 import { ResultDialog } from "./ResultDialog";
 import { PixelBlacksmith } from "./PixelBlacksmith";
+import { NPCStatus } from "../npc/NPCStatus";
 import { useGameStore } from "@/store/gameStore";
 import { Recipe, Equipment, Quality } from "@/types/game";
 import { generateItemId, calculateQuality } from "@/store/gameStore";
@@ -192,6 +193,9 @@ export function Workshop() {
               <PixelBlacksmith size={120} isForging={isForging} />
             </CardContent>
           </Card>
+
+          {/* NPC Status */}
+          <NPCStatus />
         </div>
 
         {/* Forging Area */}

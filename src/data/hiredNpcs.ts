@@ -186,6 +186,7 @@ export const getRandomHiredNPC = (quality: NPCQuality): HiredNPC => {
     hired: true,
     hiredAt: Date.now(),
     experienceLevel: 1,
+    avatarSeed: Math.random().toString(36).substring(7) + Date.now().toString(),
   };
 };
 

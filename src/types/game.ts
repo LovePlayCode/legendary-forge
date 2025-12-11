@@ -131,6 +131,7 @@ export interface HiredNPC extends NPC {
   salary: number;
   hiredAt: number;
   experienceLevel: number;   // 经验等级（1-5）
+  avatarSeed?: string;       // 头像生成种子
 }
 
 export interface Order {
