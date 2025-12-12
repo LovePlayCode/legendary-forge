@@ -1,0 +1,1 @@
+export { MineView } from './MineView';

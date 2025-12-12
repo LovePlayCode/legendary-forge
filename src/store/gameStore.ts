@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { GameState, Equipment, Material, Order, Expedition, Quality, MaterialType, EventCard, ActiveEffect, EffectType, NPCQuality } from '@/types/game';
+import { GameState, Equipment, Material, Order, Expedition, Quality, MaterialType, EventCard, ActiveEffect, EffectType, NPCQuality, PlayerEquipment, MineState, BattleLog, EquipmentSlot } from '@/types/game';
 import { initialRecipes } from '@/data/recipes';
 import { initialUpgrades } from '@/data/upgrades';
 import { getRandomCards, EVENT_INTERVAL } from '@/data/events';
 import { getRandomHiredNPC, hireCost } from '@/data/hiredNpcs';
+import { generateMonster, calculateMiningDrops, Monster, materialNames } from '@/data/mine';
 
 interface GameActions {
   addGold: (amount: number) => void;
@@ -36,9 +37,39 @@ interface GameActions {
   hireNPC: (quality: NPCQuality) => boolean;
   fireNPC: (npcId: string) => void;
   upgradeNPCExperience: (npcId: string) => void;
+  // 矿场系统方法
+  equipItem: (slot: EquipmentSlot, equipment: Equipment | null) => void;
+  unequipItem: (slot: EquipmentSlot) => void;
+  getPlayerPower: () => { attack: number; defense: number; total: number };
+  enterMine: (level: number) => void;
+  spawnMonster: () => void;
+  performBattle: () => void;
+  performMining: () => void;
+  addBattleLog: (message: string, type: BattleLog['type']) => void;
+  clearBattleLogs: () => void;
+  unlockMineLevel: (level: number) => void;
+  updateEquipmentDurability: (slot: EquipmentSlot, amount: number) => void;
 }
 
-const GAME_VERSION = 3; // 增加版本号用于迁移
+const GAME_VERSION = 4; // 增加版本号用于迁移
+
+const initialPlayerEquipment: PlayerEquipment = {
+  weapon: null,
+  armor: null,
+  accessory: null,
+};
+
+const initialMineState: MineState = {
+  currentLevel: 1,
+  unlockedLevels: [1],
+  currentMonster: null,
+  battlePhase: 'idle',
+  playerHp: 100,
+  maxPlayerHp: 100,
+  battleLogs: [],
+  canMine: false,
+  miningProgress: 0,
+};
 
 const initialState: GameState = {
   gold: 100,
@@ -67,6 +98,9 @@ const initialState: GameState = {
   // NPC 雇佣系统初始状态
   hiredNPCs: [],
   maxHiredNPCs: 3,
+  // 矿场系统初始状态
+  playerEquipment: initialPlayerEquipment,
+  mineState: initialMineState,
   version: GAME_VERSION,
 };
 
@@ -380,9 +414,302 @@ export const useGameStore = create<GameState & GameActions>()(
           return npc;
         }),
       })),
+
+      // 矿场系统方法
+      equipItem: (slot: EquipmentSlot, equipment: Equipment | null) => {
+        const state = get();
+        const currentEquipped = state.playerEquipment[slot];
+        
+        // 如果当前槽位有装备，放回背包
+        if (currentEquipped) {
+          set({
+            inventory: [...state.inventory, currentEquipped],
+          });
+        }
+        
+        // 如果要装备新装备，从背包移除
+        if (equipment) {
+          set((s) => ({
+            inventory: s.inventory.filter((i) => i.id !== equipment.id),
+            playerEquipment: {
+              ...s.playerEquipment,
+              [slot]: equipment,
+            },
+          }));
+        } else {
+          set((s) => ({
+            playerEquipment: {
+              ...s.playerEquipment,
+              [slot]: null,
+            },
+          }));
+        }
+      },
+
+      unequipItem: (slot: EquipmentSlot) => {
+        const state = get();
+        const equipment = state.playerEquipment[slot];
+        if (equipment) {
+          set({
+            inventory: [...state.inventory, equipment],
+            playerEquipment: {
+              ...state.playerEquipment,
+              [slot]: null,
+            },
+          });
+        }
+      },
+
+      getPlayerPower: () => {
+        const state = get();
+        const { weapon, armor, accessory } = state.playerEquipment;
+        let attack = 5; // 基础攻击力
+        let defense = 2; // 基础防御力
+        
+        if (weapon) {
+          attack += weapon.attack || 0;
+          defense += weapon.defense || 0;
+        }
+        if (armor) {
+          attack += armor.attack || 0;
+          defense += armor.defense || 0;
+        }
+        if (accessory) {
+          attack += accessory.attack || 0;
+          defense += accessory.defense || 0;
+        }
+        
+        return { attack, defense, total: attack + defense };
+      },
+
+      enterMine: (level: number) => {
+        const state = get();
+        if (!state.mineState.unlockedLevels.includes(level)) return;
+        
+        set({
+          mineState: {
+            ...state.mineState,
+            currentLevel: level,
+            currentMonster: null,
+            battlePhase: 'idle',
+            playerHp: state.mineState.maxPlayerHp,
+            canMine: false,
+            miningProgress: 0,
+          },
+        });
+        
+        // 自动生成怪物
+        get().spawnMonster();
+      },
+
+      spawnMonster: () => {
+        const state = get();
+        const monster = generateMonster(state.mineState.currentLevel);
+        
+        get().addBattleLog(`${monster.name} 出现了！`, 'info');
+        
+        set({
+          mineState: {
+            ...state.mineState,
+            currentMonster: monster,
+            battlePhase: 'idle',
+            canMine: false,
+          },
+        });
+      },
+
+      performBattle: () => {
+        const state = get();
+        const monster = state.mineState.currentMonster as Monster | null;
+        if (!monster || state.mineState.battlePhase === 'fighting') return;
+        
+        set((s) => ({
+          mineState: { ...s.mineState, battlePhase: 'fighting' },
+        }));
+        
+        const { attack: playerAttack, defense: playerDefense } = get().getPlayerPower();
+        
+        // 玩家攻击
+        const playerDamage = Math.max(1, playerAttack - monster.defense);
+        const newMonsterHp = monster.hp - playerDamage;
+        
+        get().addBattleLog(`你对 ${monster.name} 造成了 ${playerDamage} 点伤害！`, 'attack');
+        
+        if (newMonsterHp <= 0) {
+          // 怪物被击败
+          get().addBattleLog(`${monster.name} 被击败了！`, 'victory');
+          get().addBattleLog(`获得 ${monster.goldReward} 金币！`, 'loot');
+          
+          // 消耗武器耐久
+          if (state.playerEquipment.weapon) {
+            get().updateEquipmentDurability('weapon', -2);
+          }
+          
+          set((s) => ({
+            gold: s.gold + monster.goldReward,
+            mineState: {
+              ...s.mineState,
+              currentMonster: null,
+              battlePhase: 'victory',
+              canMine: true,
+            },
+          }));
+          
+          // 检查是否解锁下一层
+          const currentLevel = state.mineState.currentLevel;
+          if (currentLevel < 10 && !state.mineState.unlockedLevels.includes(currentLevel + 1)) {
+            get().unlockMineLevel(currentLevel + 1);
+          }
+          
+          return;
+        }
+        
+        // 怪物攻击
+        const monsterDamage = Math.max(1, monster.attack - playerDefense);
+        const newPlayerHp = state.mineState.playerHp - monsterDamage;
+        
+        get().addBattleLog(`${monster.name} 对你造成了 ${monsterDamage} 点伤害！`, 'damage');
+        
+        // 消耗护甲耐久
+        if (state.playerEquipment.armor) {
+          get().updateEquipmentDurability('armor', -1);
+        }
+        
+        if (newPlayerHp <= 0) {
+          // 玩家被击败
+          get().addBattleLog('你被击败了，被迫撤退...', 'defeat');
+          
+          set((s) => ({
+            mineState: {
+              ...s.mineState,
+              playerHp: 0,
+              battlePhase: 'defeat',
+              currentMonster: null,
+            },
+          }));
+          return;
+        }
+        
+        // 更新状态
+        set((s) => ({
+          mineState: {
+            ...s.mineState,
+            currentMonster: { ...monster, hp: newMonsterHp },
+            playerHp: newPlayerHp,
+            battlePhase: 'idle',
+          },
+        }));
+      },
+
+      performMining: () => {
+        const state = get();
+        if (!state.mineState.canMine) return;
+        
+        // 消耗武器耐久（挖矿）
+        if (state.playerEquipment.weapon) {
+          get().updateEquipmentDurability('weapon', -3);
+        }
+        
+        // 计算掉落
+        const drops = calculateMiningDrops(state.mineState.currentLevel);
+        
+        for (const drop of drops) {
+          const material: Material = {
+            id: `mat-${drop.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name: materialNames[drop.type],
+            category: 'material',
+            type: drop.type,
+            quality: 'common',
+            icon: 'GiMineralPearls',
+            description: '从矿场获得的材料',
+            sellPrice: 5,
+            quantity: drop.quantity,
+          };
+          
+          get().addItem(material);
+          get().addBattleLog(`获得 ${materialNames[drop.type]} x${drop.quantity}！`, 'loot');
+        }
+        
+        set((s) => ({
+          mineState: {
+            ...s.mineState,
+            canMine: false,
+            battlePhase: 'idle',
+          },
+        }));
+        
+        // 生成新怪物
+        setTimeout(() => {
+          get().spawnMonster();
+        }, 1000);
+      },
+
+      addBattleLog: (message: string, type: BattleLog['type']) => {
+        const log: BattleLog = {
+          id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          message,
+          type,
+          timestamp: Date.now(),
+        };
+        
+        set((state) => ({
+          mineState: {
+            ...state.mineState,
+            battleLogs: [...state.mineState.battleLogs.slice(-49), log], // 保留最近50条
+          },
+        }));
+      },
+
+      clearBattleLogs: () => set((state) => ({
+        mineState: {
+          ...state.mineState,
+          battleLogs: [],
+        },
+      })),
+
+      unlockMineLevel: (level: number) => {
+        const state = get();
+        if (state.mineState.unlockedLevels.includes(level)) return;
+        
+        get().addBattleLog(`解锁了第 ${level} 层矿场！`, 'info');
+        
+        set({
+          mineState: {
+            ...state.mineState,
+            unlockedLevels: [...state.mineState.unlockedLevels, level].sort((a, b) => a - b),
+          },
+        });
+      },
+
+      updateEquipmentDurability: (slot: EquipmentSlot, amount: number) => {
+        const state = get();
+        const equipment = state.playerEquipment[slot];
+        if (!equipment) return;
+        
+        const newDurability = Math.max(0, equipment.durability + amount);
+        
+        if (newDurability <= 0) {
+          // 装备损坏
+          get().addBattleLog(`${equipment.name} 已损坏！`, 'info');
+          set({
+            playerEquipment: {
+              ...state.playerEquipment,
+              [slot]: null,
+            },
+          });
+        } else {
+          set({
+            playerEquipment: {
+              ...state.playerEquipment,
+              [slot]: { ...equipment, durability: newDurability },
+            },
+          });
+        }
+      },
     }),
     {
       name: 'legendary-forge-save',
+      version: GAME_VERSION,
       // 版本迁移：如果存储的版本低于当前版本，自动重置为新的初始状态
       migrate: (persistedState: unknown, version: number) => {
         const state = persistedState as Partial<GameState> | undefined;

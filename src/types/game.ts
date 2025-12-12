@@ -209,6 +209,40 @@ export interface ActiveEffect {
   name: string;
 }
 
+// 装备槽位类型
+export type EquipmentSlot = 'weapon' | 'armor' | 'accessory';
+
+// 玩家装备状态
+export interface PlayerEquipment {
+  weapon: Equipment | null;
+  armor: Equipment | null;
+  accessory: Equipment | null;
+}
+
+// 战斗状态
+export type BattlePhase = 'idle' | 'fighting' | 'victory' | 'defeat' | 'mining';
+
+// 战斗日志
+export interface BattleLog {
+  id: string;
+  message: string;
+  type: 'attack' | 'defend' | 'damage' | 'victory' | 'defeat' | 'loot' | 'info';
+  timestamp: number;
+}
+
+// 矿场状态
+export interface MineState {
+  currentLevel: number;
+  unlockedLevels: number[];
+  currentMonster: import('@/data/mine').Monster | null;
+  battlePhase: BattlePhase;
+  playerHp: number;
+  maxPlayerHp: number;
+  battleLogs: BattleLog[];
+  canMine: boolean;
+  miningProgress: number;
+}
+
 export interface GameState {
   gold: number;
   reputation: number;
@@ -231,6 +265,9 @@ export interface GameState {
   // NPC 雇佣系统
   hiredNPCs: HiredNPC[];        // 已雇佣的 NPC 列表
   maxHiredNPCs: number;         // 最多能雇佣的 NPC 数量
+  // 矿场系统
+  playerEquipment: PlayerEquipment;  // 玩家装备
+  mineState: MineState;              // 矿场状态
   // 版本控制
   version?: number;
 }

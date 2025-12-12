@@ -1,9 +1,9 @@
-import { GiAnvilImpact, GiScrollUnfurled, GiKnapsack, GiTreasureMap, GiUpgrade, GiPerson } from 'react-icons/gi';
+import { GiAnvilImpact, GiScrollUnfurled, GiKnapsack, GiTreasureMap, GiUpgrade, GiPerson, GiMineWagon } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-export type GameView = 'workshop' | 'orders' | 'inventory' | 'exploration' | 'upgrades' | 'npc';
+export type GameView = 'workshop' | 'orders' | 'inventory' | 'exploration' | 'upgrades' | 'npc' | 'mine';
 
 interface SidebarProps {
   currentView: GameView;
@@ -15,6 +15,7 @@ const navItems: { id: GameView; icon: React.ElementType; label: string }[] = [
   { id: 'orders', icon: GiScrollUnfurled, label: '订单柜台' },
   { id: 'inventory', icon: GiKnapsack, label: '仓库管理' },
   { id: 'exploration', icon: GiTreasureMap, label: '探险采购' },
+  { id: 'mine', icon: GiMineWagon, label: '矿场探险' },
   { id: 'npc', icon: GiPerson, label: 'NPC 管理' },
   { id: 'upgrades', icon: GiUpgrade, label: '店铺升级' },
 ];

@@ -45,7 +45,7 @@ export const NPCGallery = () => {
                         {npc.profession === 'mage' && '🔮'}
                         {npc.profession === 'merchant' && '💰'}
                         {npc.profession === 'adventurer' && '🗺️'}
-                        {npc.profession === 'villager' && '🏠'}
+                        {(npc.profession as string) === 'villager' && '🏠'}
                       </p>
                     </div>
                   </div>
