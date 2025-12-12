@@ -177,33 +177,43 @@ const drawWeapon = (ctx: CanvasRenderingContext2D, type: EquipmentType, quality:
     const bladeLen = isDagger ? 10 + Math.floor(rand() * 4) : 16 + Math.floor(rand() * 6);
     const bladeWidth = isDagger ? 2 : 2 + Math.floor(rand() * 2);
     const hiltLen = isDagger ? 4 : 5 + Math.floor(rand() * 2);
+    const pommelLen = 2;
     
-    // Blade
+    // Calculate total height to center vertically
+    const totalHeight = bladeLen + hiltLen + pommelLen;
+    const startY = Math.floor((32 - totalHeight) / 2); // Start from top
+    
+    // Blade (from top down)
+    const bladeStartY = startY;
+    
     ctx.fillStyle = metal.base;
     for(let i=0; i<bladeLen; i++) {
         // Tapering
         let w = bladeWidth;
-        if (i > bladeLen - 3) w = Math.max(1, w - 1); // Tip
-        const bx = cx - w/2 + (rand() * 0.5); // Micro-variation
-        drawRect(ctx, Math.floor(bx), cy - hiltLen - i, w, 1, metal.base);
+        if (i < 2) w = Math.max(1, w - 1); // Tip at the top
+        const bx = cx - w/2 + (rand() * 0.5); 
+        // Draw from top (tip) down to guard
+        drawRect(ctx, Math.floor(bx), bladeStartY + i, w, 1, metal.base);
         // Shine/Reflection
-        if (i < bladeLen - 2) drawRect(ctx, Math.floor(bx) + 1, cy - hiltLen - i, 1, 1, metal.light);
+        if (i > 1) drawRect(ctx, Math.floor(bx) + 1, bladeStartY + i, 1, 1, metal.light);
     }
 
     // Guard
     const guardWidth = isDagger ? 4 + rand()*2 : 6 + rand()*4;
-    const guardY = cy - hiltLen;
+    const guardY = bladeStartY + bladeLen;
     drawRect(ctx, cx - guardWidth/2, guardY, guardWidth, 2, metal.shadow);
     drawRect(ctx, cx - guardWidth/2 + 1, guardY + 0.5, guardWidth - 2, 1, metal.base);
 
     // Hilt
-    drawRect(ctx, cx - 1, cy - hiltLen + 2, 2, hiltLen, wood.base);
-    dither(ctx, cx - 1, cy - hiltLen + 2, 2, hiltLen, wood.shadow, 0.3, rand);
+    const hiltY = guardY + 2;
+    drawRect(ctx, cx - 1, hiltY, 2, hiltLen, wood.base);
+    dither(ctx, cx - 1, hiltY, 2, hiltLen, wood.shadow, 0.3, rand);
 
     // Pommel
-    drawRect(ctx, cx - 1.5, cy, 3, 2, metal.base);
+    const pommelY = hiltY + hiltLen;
+    drawRect(ctx, cx - 1.5, pommelY, 3, 2, metal.base);
     if (['rare', 'epic', 'legendary', 'mythic'].includes(quality)) {
-        drawPixel(ctx, cx, cy + 0.5, gemColor);
+        drawPixel(ctx, cx, pommelY + 0.5, gemColor);
     }
   }
   
@@ -211,60 +221,64 @@ const drawWeapon = (ctx: CanvasRenderingContext2D, type: EquipmentType, quality:
      // Pole/Handle
      const poleLen = type === 'spear' || type === 'staff' ? 26 : 20;
      const poleWidth = 2;
-     drawRect(ctx, cx - poleWidth/2, cy - poleLen/2 + 4, poleWidth, poleLen, wood.base);
-     dither(ctx, cx - poleWidth/2, cy - poleLen/2 + 4, poleWidth, poleLen, wood.shadow, 0.3, rand);
+     
+     // Center the pole
+     const startY = Math.floor((32 - poleLen) / 2);
+     
+     drawRect(ctx, cx - poleWidth/2, startY, poleWidth, poleLen, wood.base);
+     dither(ctx, cx - poleWidth/2, startY, poleWidth, poleLen, wood.shadow, 0.3, rand);
      
      // Head
      if (type === 'axe') {
         const headW = 10;
         const headH = 8;
-        const headY = cy - poleLen/2 + 6;
+        const headY = startY + 2; // Near top
         // Double bit or Single bit
         const doubleBit = rand() > 0.5;
         
         // Right blade
-        drawRect(ctx, cx + 1, headY - headH/2, headW/2, headH, metal.base);
-        drawRect(ctx, cx + 1 + headW/2 - 1, headY - headH/2, 1, headH, metal.light); // Edge
+        drawRect(ctx, cx + 1, headY, headW/2, headH, metal.base);
+        drawRect(ctx, cx + 1 + headW/2 - 1, headY, 1, headH, metal.light); // Edge
         
         // Left blade
         if (doubleBit) {
-            drawRect(ctx, cx - 1 - headW/2, headY - headH/2, headW/2, headH, metal.base);
-            drawRect(ctx, cx - 1 - headW/2, headY - headH/2, 1, headH, metal.light); // Edge
+            drawRect(ctx, cx - 1 - headW/2, headY, headW/2, headH, metal.base);
+            drawRect(ctx, cx - 1 - headW/2, headY, 1, headH, metal.light); // Edge
         } else {
-             drawRect(ctx, cx - 3, headY - headH/4, 3, headH/2, metal.shadow); // Back
+             drawRect(ctx, cx - 3, headY + 2, 3, headH/2, metal.shadow); // Back
         }
      }
      
      if (type === 'hammer') {
         const headW = 10;
         const headH = 6;
-        const headY = cy - poleLen/2 + 6;
-        drawRect(ctx, cx - headW/2, headY - headH/2, headW, headH, metal.base);
-        drawRect(ctx, cx - headW/2 + 1, headY - headH/2 + 1, headW - 2, headH - 2, metal.light);
+        const headY = startY + 2;
+        drawRect(ctx, cx - headW/2, headY, headW, headH, metal.base);
+        drawRect(ctx, cx - headW/2 + 1, headY + 1, headW - 2, headH - 2, metal.light);
         // Bands
-        drawRect(ctx, cx - headW/2 + 3, headY - headH/2, 1, headH, metal.shadow);
-        drawRect(ctx, cx + headW/2 - 4, headY - headH/2, 1, headH, metal.shadow);
+        drawRect(ctx, cx - headW/2 + 3, headY, 1, headH, metal.shadow);
+        drawRect(ctx, cx + headW/2 - 4, headY, 1, headH, metal.shadow);
      }
 
      if (type === 'spear') {
         const tipLen = 8;
-        const tipY = cy - poleLen/2 + 4;
+        const tipY = startY - tipLen + 2; // Extend above pole
         // Tip
         for(let i=0; i<tipLen; i++) {
-            const w = Math.max(1, 3 - Math.floor(i/2));
-            drawRect(ctx, cx - w/2, tipY - i, w, 1, metal.base);
+            const w = Math.max(1, 3 - Math.floor((tipLen - i)/2));
+            drawRect(ctx, cx - w/2, tipY + i, w, 1, metal.base);
         }
      }
      
      if (type === 'staff') {
          // Orb or Gem
          const orbSize = 5;
-         const orbY = cy - poleLen/2 + 2;
-         drawRect(ctx, cx - orbSize/2, orbY - orbSize/2, orbSize, orbSize, gemColor);
-         drawPixel(ctx, cx - 1, orbY - 1, '#fff'); // Highlight
+         const orbY = startY - orbSize/2;
+         drawRect(ctx, cx - orbSize/2, orbY, orbSize, orbSize, gemColor);
+         drawPixel(ctx, cx - 1, orbY + 1, '#fff'); // Highlight
          // Prongs
-         drawRect(ctx, cx - orbSize/2 - 1, orbY, 1, 4, wood.light);
-         drawRect(ctx, cx + orbSize/2, orbY, 1, 4, wood.light);
+         drawRect(ctx, cx - orbSize/2 - 1, orbY + 2, 1, 4, wood.light);
+         drawRect(ctx, cx + orbSize/2, orbY + 2, 1, 4, wood.light);
      }
   }
 
@@ -379,12 +393,12 @@ const drawArmor = (ctx: CanvasRenderingContext2D, type: EquipmentType, quality: 
     if (type === 'boots') {
         const color = getMaterialTier(quality, 'wood').base; // Leather
         // Left Boot
-        drawRect(ctx, cx - 8, cy - 2, 6, 8, color); // Leg
-        drawRect(ctx, cx - 10, cy + 6, 8, 4, color); // Foot
+        drawRect(ctx, cx - 8, cy - 4, 6, 8, color); // Leg
+        drawRect(ctx, cx - 10, cy + 4, 8, 4, color); // Foot
         
         // Right Boot
-        drawRect(ctx, cx + 2, cy - 2, 6, 8, color);
-        drawRect(ctx, cx + 2, cy + 6, 8, 4, color);
+        drawRect(ctx, cx + 2, cy - 4, 6, 8, color);
+        drawRect(ctx, cx + 2, cy + 4, 8, 4, color);
     }
 };
 
