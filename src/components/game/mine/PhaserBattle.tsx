@@ -1,0 +1,1602 @@
+import { useEffect, useRef } from 'react';
+import Phaser from 'phaser';
+import { Monster } from '@/data/mine';
+
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
+interface PhaserBattleProps {
+  monster: Monster | null;
+  playerHp: number;
+  maxPlayerHp: number;
+  battlePhase: 'idle' | 'fighting' | 'victory' | 'defeat' | 'mining';
+  canMine: boolean;
+  onAttack: () => void;
+  onMine: () => void;
+}
+
+// 战斗场景类
+class BattleScene extends Phaser.Scene {
+  private monster: Monster | null = null;
+  private playerHp: number = 100;
+  private maxPlayerHp: number = 100;
+  private battlePhase: string = 'idle';
+  private canMine: boolean = false;
+  private onAttack: (() => void) | null = null;
+  private onMine: (() => void) | null = null;
+
+  // 游戏对象
+  private playerSprite!: Phaser.GameObjects.Container;
+  private playerSword!: Phaser.GameObjects.Container;
+  private monsterSprite!: Phaser.GameObjects.Container;
+  private oreSprite!: Phaser.GameObjects.Container;
+  private actionButton!: Phaser.GameObjects.Container;
+  private playerHpBar!: Phaser.GameObjects.Graphics;
+  private monsterHpBar!: Phaser.GameObjects.Graphics;
+  private monsterNameText!: Phaser.GameObjects.Text;
+  private monsterHpText!: Phaser.GameObjects.Text;
+  private monsterStatsText!: Phaser.GameObjects.Text;
+  private torches: Phaser.GameObjects.Container[] = [];
+  private defeatOverlay!: Phaser.GameObjects.Container;
+  private idleContainer!: Phaser.GameObjects.Container;
+  private comboContainer!: Phaser.GameObjects.Container;
+  private comboText!: Phaser.GameObjects.Text;
+
+  // 粒子发射器
+  private bloodEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private sparkEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private rockEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private dustEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private magicEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private goldEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private slashEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+
+  // 状态追踪
+  private lastMonsterHp: number = 0;
+  private lastPlayerHp: number = 0;
+  private comboCount: number = 0;
+  private lastAttackTime: number = 0;
+  private isAttacking: boolean = false;
+
+  // 环境效果
+  private ambientParticles: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
+  private backgroundGlow!: Phaser.GameObjects.Graphics;
+
+  constructor() {
+    super({ key: 'BattleScene' });
+  }
+
+  init(data: {
+    monster: Monster | null;
+    playerHp: number;
+    maxPlayerHp: number;
+    battlePhase: string;
+    canMine: boolean;
+    onAttack: () => void;
+    onMine: () => void;
+  }) {
+    this.monster = data.monster;
+    this.playerHp = data.playerHp;
+    this.maxPlayerHp = data.maxPlayerHp;
+    this.battlePhase = data.battlePhase;
+    this.canMine = data.canMine;
+    this.onAttack = data.onAttack;
+    this.onMine = data.onMine;
+    this.lastMonsterHp = data.monster?.hp || 0;
+    this.lastPlayerHp = data.playerHp;
+    this.comboCount = 0;
+    this.isAttacking = false;
+  }
+
+  create() {
+    const width = this.cameras.main.width;
+    const height = this.cameras.main.height;
+
+    // 创建粒子纹理
+    this.createParticleTextures();
+
+    // 创建洞穴背景
+    this.createCaveBackground(width, height);
+
+    // 创建火把
+    this.createTorches(width, height);
+
+    // 创建粒子系统
+    this.createParticleSystems();
+
+    // 创建灰尘粒子
+    this.createDustParticles(width, height);
+
+    // 创建玩家
+    this.createPlayer(width, height);
+
+    // 创建怪物
+    this.createMonster(width, height);
+
+    // 创建矿石
+    this.createOre(width, height);
+
+    // 创建操作按钮
+    this.createActionButton(width, height);
+
+    // 创建连击显示
+    this.createComboDisplay(width, height);
+
+    // 创建失败遮罩
+    this.createDefeatOverlay(width, height);
+
+    // 创建空闲状态容器
+    this.createIdleContainer(width, height);
+
+    // 更新显示状态
+    this.updateVisibility();
+
+    // 添加键盘交互
+    this.input.keyboard?.on('keydown-SPACE', () => {
+      this.handleAction();
+    });
+
+    // 添加点击任意位置攻击
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      // 检查是否点击在按钮区域外
+      const btnBounds = this.actionButton.getBounds();
+      if (!btnBounds.contains(pointer.x, pointer.y)) {
+        if (this.monster && this.battlePhase !== 'fighting' && !this.isAttacking) {
+          this.handleAction();
+        }
+      }
+    });
+  }
+
+  private createParticleTextures() {
+    // 基础圆形粒子
+    if (!this.textures.exists('particle')) {
+      const g1 = this.add.graphics();
+      g1.fillStyle(0xffffff);
+      g1.fillCircle(8, 8, 8);
+      g1.generateTexture('particle', 16, 16);
+      g1.destroy();
+    }
+
+    // 星形粒子
+    if (!this.textures.exists('star')) {
+      const g2 = this.add.graphics();
+      g2.fillStyle(0xffffff);
+      g2.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const angle = (i * 72 - 90) * Math.PI / 180;
+        const x = 8 + Math.cos(angle) * 8;
+        const y = 8 + Math.sin(angle) * 8;
+        if (i === 0) g2.moveTo(x, y);
+        else g2.lineTo(x, y);
+        const innerAngle = ((i * 72) + 36 - 90) * Math.PI / 180;
+        const ix = 8 + Math.cos(innerAngle) * 3;
+        const iy = 8 + Math.sin(innerAngle) * 3;
+        g2.lineTo(ix, iy);
+      }
+      g2.closePath();
+      g2.fillPath();
+      g2.generateTexture('star', 16, 16);
+      g2.destroy();
+    }
+
+    // 斜线粒子（用于剑气）
+    if (!this.textures.exists('slash')) {
+      const g3 = this.add.graphics();
+      g3.fillStyle(0xffffff);
+      g3.fillRect(0, 6, 32, 4);
+      g3.generateTexture('slash', 32, 16);
+      g3.destroy();
+    }
+  }
+
+  private createCaveBackground(width: number, height: number) {
+    // 深色背景渐变
+    const bg = this.add.graphics();
+    bg.fillGradientStyle(0x2a2520, 0x2a2520, 0x0d0c0a, 0x0d0c0a, 1);
+    bg.fillRect(0, 0, width, height);
+
+    // 背景光晕效果
+    this.backgroundGlow = this.add.graphics();
+    this.backgroundGlow.fillStyle(0xff6600, 0.03);
+    this.backgroundGlow.fillCircle(width / 2, height / 2, 200);
+
+    // 岩石纹理 - 更多层次
+    for (let i = 0; i < 30; i++) {
+      const x = Phaser.Math.Between(0, width);
+      const y = Phaser.Math.Between(0, height);
+      const size = Phaser.Math.Between(15, 60);
+      const alpha = Phaser.Math.FloatBetween(0.08, 0.2);
+      const color = Phaser.Math.RND.pick([0x3a3530, 0x4a4540, 0x2a2520]);
+      const rock = this.add.ellipse(x, y, size, size * 0.7, color, alpha);
+      rock.setAngle(Phaser.Math.Between(0, 360));
+    }
+
+    // 洞穴边缘阴影
+    const edgeShadow = this.add.graphics();
+    edgeShadow.fillStyle(0x000000, 0.4);
+    edgeShadow.fillRect(0, 0, 30, height);
+    edgeShadow.fillRect(width - 30, 0, 30, height);
+    edgeShadow.fillRect(0, 0, width, 20);
+
+    // 地面 - 多层次
+    const ground = this.add.graphics();
+    ground.fillStyle(0x3a3530);
+    ground.fillRect(0, height - 45, width, 45);
+    ground.fillStyle(0x4a4540);
+    ground.fillRect(0, height - 45, width, 5);
+
+    // 地面纹理线条
+    const groundLines = this.add.graphics();
+    groundLines.lineStyle(1, 0x5a5550, 0.5);
+    for (let i = 0; i < 15; i++) {
+      groundLines.beginPath();
+      groundLines.moveTo(i * 45, height - 45);
+      groundLines.lineTo(i * 45 + 20, height);
+      groundLines.strokePath();
+    }
+
+    // 地面小石子
+    for (let i = 0; i < 12; i++) {
+      const x = Phaser.Math.Between(20, width - 20);
+      const y = Phaser.Math.Between(height - 40, height - 10);
+      const size = Phaser.Math.Between(3, 8);
+      this.add.ellipse(x, y, size, size * 0.6, 0x5a5550, 0.6);
+    }
+  }
+
+  private createTorches(width: number, _height: number) {
+    const torchPositions = [
+      { x: 40, y: 60 },
+      { x: width - 40, y: 60 },
+      { x: 40, y: 220 },
+      { x: width - 40, y: 220 },
+    ];
+
+    torchPositions.forEach((pos, index) => {
+      const torch = this.add.container(pos.x, pos.y);
+
+      // 火把柄
+      const handle = this.add.rectangle(0, 18, 8, 35, 0x5d4037);
+      torch.add(handle);
+
+      // 火把顶部
+      const top = this.add.rectangle(0, 0, 12, 8, 0x8d6e63);
+      torch.add(top);
+
+      // 火焰（多层）
+      const flame1 = this.add.ellipse(0, -8, 16, 28, 0xff4400, 0.7);
+      const flame2 = this.add.ellipse(0, -12, 12, 22, 0xff6600, 0.8);
+      const flame3 = this.add.ellipse(0, -15, 8, 16, 0xffaa00, 0.9);
+      const flame4 = this.add.ellipse(0, -18, 4, 10, 0xffff00, 1);
+      torch.add([flame1, flame2, flame3, flame4]);
+
+      // 光晕
+      const glow = this.add.ellipse(0, 0, 180, 180, 0xff6600, 0.08);
+      torch.add(glow);
+      torch.sendToBack(glow);
+
+      // 火焰动画 - 更自然
+      this.tweens.add({
+        targets: [flame1, flame2],
+        scaleY: { from: 0.85, to: 1.15 },
+        scaleX: { from: 0.9, to: 1.1 },
+        duration: 150 + index * 30,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+
+      this.tweens.add({
+        targets: [flame3, flame4],
+        scaleY: { from: 0.9, to: 1.2 },
+        scaleX: { from: 0.95, to: 1.1 },
+        y: { from: flame3.y, to: flame3.y - 3 },
+        duration: 120 + index * 20,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+
+      // 光晕闪烁
+      this.tweens.add({
+        targets: glow,
+        alpha: { from: 0.06, to: 0.12 },
+        scale: { from: 0.95, to: 1.08 },
+        duration: 250 + index * 80,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+
+      this.torches.push(torch);
+    });
+  }
+
+  private createParticleSystems() {
+    // 血液粒子 - 更多细节
+    this.bloodEmitter = this.add.particles(0, 0, 'particle', {
+      speed: { min: 120, max: 280 },
+      angle: { min: 180, max: 360 },
+      scale: { start: 0.8, end: 0 },
+      lifespan: 700,
+      gravityY: 350,
+      tint: [0xff4444, 0xcc3333, 0xff6666],
+      emitting: false,
+    });
+
+    // 火花粒子
+    this.sparkEmitter = this.add.particles(0, 0, 'star', {
+      speed: { min: 180, max: 350 },
+      angle: { min: 200, max: 340 },
+      scale: { start: 0.5, end: 0 },
+      lifespan: 500,
+      gravityY: 250,
+      tint: [0xffaa00, 0xff6600, 0xffff00, 0xffffff],
+      rotate: { min: 0, max: 360 },
+      emitting: false,
+    });
+
+    // 岩石粒子
+    this.rockEmitter = this.add.particles(0, 0, 'particle', {
+      speed: { min: 100, max: 220 },
+      angle: { min: 180, max: 360 },
+      scale: { start: 1, end: 0.3 },
+      lifespan: 900,
+      gravityY: 450,
+      tint: [0x5d4037, 0x795548, 0x8d6e63, 0xa1887f],
+      emitting: false,
+    });
+
+    // 魔法粒子
+    this.magicEmitter = this.add.particles(0, 0, 'star', {
+      speed: { min: 50, max: 150 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.6, end: 0 },
+      lifespan: 800,
+      alpha: { start: 1, end: 0 },
+      tint: [0x00ffff, 0x00ff88, 0x88ffff],
+      rotate: { min: 0, max: 360 },
+      emitting: false,
+    });
+
+    // 金币粒子
+    this.goldEmitter = this.add.particles(0, 0, 'star', {
+      speed: { min: 80, max: 200 },
+      angle: { min: 220, max: 320 },
+      scale: { start: 0.7, end: 0 },
+      lifespan: 1000,
+      gravityY: 200,
+      tint: [0xffd700, 0xffcc00, 0xffaa00],
+      rotate: { min: 0, max: 360 },
+      emitting: false,
+    });
+
+    // 剑气粒子
+    this.slashEmitter = this.add.particles(0, 0, 'slash', {
+      speed: { min: 200, max: 400 },
+      angle: { min: -30, max: 30 },
+      scale: { start: 1, end: 0.2 },
+      lifespan: 300,
+      alpha: { start: 0.8, end: 0 },
+      tint: [0xaaddff, 0xffffff, 0x88ccff],
+      emitting: false,
+    });
+  }
+
+  private createDustParticles(width: number, height: number) {
+    // 环境灰尘 - 更密集
+    this.dustEmitter = this.add.particles(width / 2, height - 60, 'particle', {
+      x: { min: -width / 2, max: width / 2 },
+      speed: { min: 8, max: 20 },
+      angle: { min: 250, max: 290 },
+      scale: { start: 0.4, end: 0 },
+      alpha: { start: 0.35, end: 0 },
+      lifespan: 5000,
+      frequency: 300,
+      tint: [0x8d8d8d, 0x9d9d9d, 0x7d7d7d],
+    });
+
+    // 漂浮的光点
+    const floatingParticles = this.add.particles(width / 2, height / 2, 'particle', {
+      x: { min: -width / 2, max: width / 2 },
+      y: { min: -height / 2, max: height / 2 },
+      speed: { min: 2, max: 8 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.2, end: 0.1 },
+      alpha: { start: 0.5, end: 0 },
+      lifespan: 6000,
+      frequency: 800,
+      tint: [0xffaa44, 0xff8844],
+    });
+    this.ambientParticles.push(floatingParticles);
+  }
+
+  private createPlayer(width: number, height: number) {
+    this.playerSprite = this.add.container(width / 2, height - 85);
+
+    // 阴影
+    const shadow = this.add.ellipse(0, 30, 55, 18, 0x000000, 0.35);
+    this.playerSprite.add(shadow);
+
+    // 腿部
+    const leftLeg = this.add.rectangle(-8, 18, 10, 20, 0x1565c0);
+    const rightLeg = this.add.rectangle(8, 18, 10, 20, 0x1565c0);
+    this.playerSprite.add([leftLeg, rightLeg]);
+
+    // 身体
+    const body = this.add.graphics();
+    body.fillStyle(0x1976d2);
+    body.fillRoundedRect(-22, -20, 44, 45, 8);
+    body.fillStyle(0x42a5f5);
+    body.fillRoundedRect(-18, -15, 36, 35, 6);
+    this.playerSprite.add(body);
+
+    // 肩甲
+    const leftShoulder = this.add.ellipse(-25, -8, 14, 12, 0x78909c);
+    const rightShoulder = this.add.ellipse(25, -8, 14, 12, 0x78909c);
+    this.playerSprite.add([leftShoulder, rightShoulder]);
+
+    // 头盔
+    const helmet = this.add.graphics();
+    helmet.fillStyle(0x78909c);
+    helmet.fillEllipse(0, -32, 34, 26);
+    helmet.fillStyle(0x90a4ae);
+    helmet.fillRect(-3, -48, 6, 14);
+    // 面罩
+    helmet.fillStyle(0x37474f);
+    helmet.fillRect(-10, -32, 20, 8);
+    this.playerSprite.add(helmet);
+
+    // 剑 - 单独容器便于动画
+    this.playerSword = this.add.container(30, -5);
+    const blade = this.add.graphics();
+    blade.fillStyle(0xb0bec5);
+    blade.fillRect(-4, -45, 8, 45);
+    blade.fillStyle(0xeceff1);
+    blade.fillRect(-2, -45, 4, 45);
+    // 剑尖
+    blade.fillStyle(0xb0bec5);
+    blade.beginPath();
+    blade.moveTo(-4, -45);
+    blade.lineTo(0, -55);
+    blade.lineTo(4, -45);
+    blade.closePath();
+    blade.fillPath();
+    this.playerSword.add(blade);
+
+    const hilt = this.add.rectangle(0, 5, 20, 8, 0x795548);
+    const pommel = this.add.circle(0, 12, 5, 0xffc107);
+    this.playerSword.add([hilt, pommel]);
+    this.playerSword.setAngle(-25);
+    this.playerSprite.add(this.playerSword);
+
+    // 盾牌
+    const shield = this.add.graphics();
+    shield.fillStyle(0x5d4037);
+    shield.beginPath();
+    shield.moveTo(-28, -15);
+    shield.lineTo(-12, -8);
+    shield.lineTo(-12, 18);
+    shield.lineTo(-28, 25);
+    shield.lineTo(-44, 18);
+    shield.lineTo(-44, -8);
+    shield.closePath();
+    shield.fillPath();
+    // 盾牌装饰
+    shield.fillStyle(0xffc107);
+    shield.fillCircle(-28, 6, 10);
+    shield.fillStyle(0xffeb3b);
+    shield.fillCircle(-28, 6, 6);
+    this.playerSprite.add(shield);
+
+    // 待机动画
+    this.tweens.add({
+      targets: this.playerSprite,
+      scaleY: { from: 1, to: 1.015 },
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // 剑的轻微摆动
+    this.tweens.add({
+      targets: this.playerSword,
+      angle: { from: -28, to: -22 },
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // 玩家血条
+    this.playerHpBar = this.add.graphics();
+    this.updatePlayerHpBar();
+  }
+
+  private createMonster(width: number, _height: number) {
+    this.monsterSprite = this.add.container(width / 2, 155);
+    this.monsterSprite.setVisible(false);
+
+    // 阴影
+    const shadow = this.add.ellipse(0, 60, 90, 25, 0x000000, 0.35);
+    shadow.setName('shadow');
+    this.monsterSprite.add(shadow);
+
+    // 怪物身体（将根据类型动态更新）
+    const monsterBody = this.add.graphics();
+    monsterBody.setName('monsterBody');
+    this.monsterSprite.add(monsterBody);
+
+    // 眼睛
+    const leftEye = this.add.ellipse(-18, -12, 18, 18, 0xffffff);
+    const rightEye = this.add.ellipse(18, -12, 18, 18, 0xffffff);
+    const leftPupil = this.add.ellipse(-16, -12, 8, 8, 0x000000);
+    const rightPupil = this.add.ellipse(20, -12, 8, 8, 0x000000);
+    leftEye.setName('leftEye');
+    rightEye.setName('rightEye');
+    leftPupil.setName('leftPupil');
+    rightPupil.setName('rightPupil');
+    this.monsterSprite.add([leftEye, rightEye, leftPupil, rightPupil]);
+
+    // 呼吸动画
+    this.tweens.add({
+      targets: this.monsterSprite,
+      scaleY: { from: 1, to: 1.04 },
+      scaleX: { from: 1, to: 1.03 },
+      duration: 1000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // 眼睛跟踪玩家
+    this.tweens.add({
+      targets: [leftPupil, rightPupil],
+      y: '+=4',
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // 左右摇晃
+    this.tweens.add({
+      targets: this.monsterSprite,
+      x: { from: width / 2 - 5, to: width / 2 + 5 },
+      duration: 2000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // 怪物名字
+    this.monsterNameText = this.add.text(width / 2, 55, '', {
+      fontSize: '18px',
+      fontFamily: 'Microsoft YaHei, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+
+    // 怪物血条
+    this.monsterHpBar = this.add.graphics();
+
+    // 怪物血量文字
+    this.monsterHpText = this.add.text(width / 2, 98, '', {
+      fontSize: '13px',
+      fontFamily: 'sans-serif',
+      color: '#cccccc',
+    }).setOrigin(0.5);
+
+    // 怪物属性文字
+    this.monsterStatsText = this.add.text(width / 2, 115, '', {
+      fontSize: '11px',
+      fontFamily: 'sans-serif',
+      color: '#999999',
+    }).setOrigin(0.5);
+  }
+
+  private createOre(width: number, _height: number) {
+    this.oreSprite = this.add.container(width / 2, 175);
+    this.oreSprite.setVisible(false);
+
+    // 矿石阴影
+    const shadow = this.add.ellipse(0, 50, 100, 25, 0x000000, 0.3);
+    this.oreSprite.add(shadow);
+
+    // 矿石主体 - 更立体
+    const ore = this.add.graphics();
+    // 底层
+    ore.fillStyle(0x2d1f1a);
+    ore.beginPath();
+    ore.moveTo(-50, 30);
+    ore.lineTo(-60, -5);
+    ore.lineTo(-30, -50);
+    ore.lineTo(20, -55);
+    ore.lineTo(55, -20);
+    ore.lineTo(50, 28);
+    ore.lineTo(10, 40);
+    ore.closePath();
+    ore.fillPath();
+    // 高光面
+    ore.fillStyle(0x4e342e);
+    ore.beginPath();
+    ore.moveTo(-30, -50);
+    ore.lineTo(20, -55);
+    ore.lineTo(55, -20);
+    ore.lineTo(10, -15);
+    ore.closePath();
+    ore.fillPath();
+    this.oreSprite.add(ore);
+
+    // 闪光点 - 更多更亮
+    const sparklePositions = [
+      { x: -20, y: -22, size: 10, color: 0xffd700 },
+      { x: 15, y: -32, size: 12, color: 0xffcc00 },
+      { x: 28, y: -5, size: 8, color: 0xffd700 },
+      { x: -38, y: 0, size: 9, color: 0xffaa00 },
+      { x: 0, y: 8, size: 11, color: 0xffd700 },
+      { x: -15, y: -40, size: 7, color: 0xffee00 },
+      { x: 35, y: 15, size: 8, color: 0xffcc00 },
+    ];
+
+    sparklePositions.forEach((pos, i) => {
+      const sparkle = this.add.ellipse(pos.x, pos.y, pos.size, pos.size, pos.color, 0.9);
+      this.oreSprite.add(sparkle);
+
+      // 闪烁动画
+      this.tweens.add({
+        targets: sparkle,
+        alpha: { from: 0.5, to: 1 },
+        scale: { from: 0.7, to: 1.3 },
+        duration: 400 + i * 80,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    });
+
+    // 挖矿提示文字
+    const mineText = this.add.text(0, 85, '✨ 点击挖矿 ✨', {
+      fontSize: '18px',
+      fontFamily: 'Microsoft YaHei, sans-serif',
+      color: '#ffc107',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setOrigin(0.5);
+    this.oreSprite.add(mineText);
+
+    // 镐子图标
+    const pickaxe = this.add.text(0, 120, '⛏️', {
+      fontSize: '42px',
+    }).setOrigin(0.5);
+    this.oreSprite.add(pickaxe);
+
+    // 提示文字脉冲
+    this.tweens.add({
+      targets: [mineText],
+      scale: { from: 1, to: 1.1 },
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    this.tweens.add({
+      targets: pickaxe,
+      y: { from: 120, to: 115 },
+      angle: { from: -10, to: 10 },
+      duration: 400,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // 矿石可点击
+    this.oreSprite.setSize(130, 120);
+    this.oreSprite.setInteractive({ useHandCursor: true });
+    this.oreSprite.on('pointerdown', () => {
+      if (this.canMine && this.onMine) {
+        this.playMiningEffect();
+        this.onMine();
+      }
+    });
+
+    this.oreSprite.on('pointerover', () => {
+      this.tweens.add({
+        targets: this.oreSprite,
+        scale: 1.05,
+        duration: 150,
+      });
+    });
+
+    this.oreSprite.on('pointerout', () => {
+      this.tweens.add({
+        targets: this.oreSprite,
+        scale: 1,
+        duration: 150,
+      });
+    });
+  }
+
+  private createActionButton(width: number, _height: number) {
+    this.actionButton = this.add.container(width / 2, 285);
+
+    // 按钮阴影
+    const btnShadow = this.add.graphics();
+    btnShadow.fillStyle(0x000000, 0.3);
+    btnShadow.fillRoundedRect(-58, -16, 116, 40, 10);
+    this.actionButton.add(btnShadow);
+
+    // 按钮背景
+    const btnBg = this.add.graphics();
+    btnBg.fillStyle(0xef4444);
+    btnBg.fillRoundedRect(-55, -18, 110, 38, 10);
+    btnBg.setName('btnBg');
+    this.actionButton.add(btnBg);
+
+    // 按钮高光
+    const btnHighlight = this.add.graphics();
+    btnHighlight.fillStyle(0xffffff, 0.25);
+    btnHighlight.fillRoundedRect(-55, -18, 110, 19, { tl: 10, tr: 10, bl: 0, br: 0 });
+    this.actionButton.add(btnHighlight);
+
+    // 按钮文字
+    const btnText = this.add.text(0, 0, '⚔️ 攻击', {
+      fontSize: '16px',
+      fontFamily: 'Microsoft YaHei, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(0.5);
+    btnText.setName('btnText');
+    this.actionButton.add(btnText);
+
+    // 交互
+    this.actionButton.setSize(110, 38);
+    this.actionButton.setInteractive({ useHandCursor: true });
+
+    this.actionButton.on('pointerover', () => {
+      this.tweens.add({
+        targets: this.actionButton,
+        scale: 1.08,
+        duration: 100,
+      });
+    });
+
+    this.actionButton.on('pointerout', () => {
+      this.tweens.add({
+        targets: this.actionButton,
+        scale: 1,
+        duration: 100,
+      });
+    });
+
+    this.actionButton.on('pointerdown', () => {
+      this.handleAction();
+    });
+
+    // 脉冲动画
+    this.tweens.add({
+      targets: this.actionButton,
+      scale: { from: 1, to: 1.03 },
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  private createComboDisplay(width: number, _height: number) {
+    this.comboContainer = this.add.container(width - 80, 160);
+    this.comboContainer.setVisible(false);
+    this.comboContainer.setAlpha(0);
+
+    // 连击背景
+    const comboBg = this.add.graphics();
+    comboBg.fillStyle(0x000000, 0.6);
+    comboBg.fillRoundedRect(-50, -25, 100, 50, 8);
+    this.comboContainer.add(comboBg);
+
+    // 连击文字
+    this.comboText = this.add.text(0, -8, 'COMBO', {
+      fontSize: '12px',
+      fontFamily: 'sans-serif',
+      color: '#ffaa00',
+    }).setOrigin(0.5);
+    this.comboContainer.add(this.comboText);
+
+    // 连击数字
+    const comboNumber = this.add.text(0, 12, '0', {
+      fontSize: '24px',
+      fontFamily: 'sans-serif',
+      color: '#ffffff',
+      stroke: '#ff6600',
+      strokeThickness: 2,
+    }).setOrigin(0.5);
+    comboNumber.setName('comboNumber');
+    this.comboContainer.add(comboNumber);
+  }
+
+  private createDefeatOverlay(width: number, height: number) {
+    this.defeatOverlay = this.add.container(0, 0);
+    this.defeatOverlay.setVisible(false);
+
+    // 暗红色遮罩
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x200000, 0.85);
+    this.defeatOverlay.add(overlay);
+
+    // 骷髅图标
+    const skull = this.add.text(width / 2, 130, '💀', {
+      fontSize: '80px',
+    }).setOrigin(0.5);
+    this.defeatOverlay.add(skull);
+
+    // 失败文字
+    const defeatText = this.add.text(width / 2, 220, '战斗失败', {
+      fontSize: '32px',
+      fontFamily: 'Microsoft YaHei, sans-serif',
+      color: '#ef4444',
+      stroke: '#000000',
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+    this.defeatOverlay.add(defeatText);
+
+    // 提示文字
+    const hintText = this.add.text(width / 2, 265, '你被击败了，需要恢复后再来', {
+      fontSize: '15px',
+      fontFamily: 'Microsoft YaHei, sans-serif',
+      color: '#9ca3af',
+    }).setOrigin(0.5);
+    this.defeatOverlay.add(hintText);
+
+    // 骷髅脉冲动画
+    this.tweens.add({
+      targets: skull,
+      scale: { from: 1, to: 1.15 },
+      duration: 400,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    // 文字抖动
+    this.tweens.add({
+      targets: defeatText,
+      x: { from: width / 2 - 2, to: width / 2 + 2 },
+      duration: 100,
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  private createIdleContainer(width: number, _height: number) {
+    this.idleContainer = this.add.container(width / 2, 175);
+    this.idleContainer.setVisible(false);
+
+    // 探索动画容器
+    const searchContainer = this.add.container(0, 0);
+    this.idleContainer.add(searchContainer);
+
+    // 探索图标
+    const searchIcon = this.add.text(0, 0, '🔦', {
+      fontSize: '65px',
+    }).setOrigin(0.5);
+    searchContainer.add(searchIcon);
+
+    // 光束效果
+    const lightBeam = this.add.graphics();
+    lightBeam.fillStyle(0xffff88, 0.15);
+    lightBeam.beginPath();
+    lightBeam.moveTo(0, 30);
+    lightBeam.lineTo(-60, 120);
+    lightBeam.lineTo(60, 120);
+    lightBeam.closePath();
+    lightBeam.fillPath();
+    searchContainer.add(lightBeam);
+    searchContainer.sendToBack(lightBeam);
+
+    // 提示文字
+    const idleText = this.add.text(0, 90, '正在探索矿场...', {
+      fontSize: '15px',
+      fontFamily: 'Microsoft YaHei, sans-serif',
+      color: '#9ca3af',
+    }).setOrigin(0.5);
+    this.idleContainer.add(idleText);
+
+    // 加载点动画
+    const dots = this.add.text(65, 90, '', {
+      fontSize: '15px',
+      fontFamily: 'sans-serif',
+      color: '#9ca3af',
+    }).setOrigin(0, 0.5);
+    this.idleContainer.add(dots);
+
+    let dotCount = 0;
+    this.time.addEvent({
+      delay: 400,
+      callback: () => {
+        dotCount = (dotCount + 1) % 4;
+        dots.setText('.'.repeat(dotCount));
+      },
+      loop: true,
+    });
+
+    // 探照灯摆动
+    this.tweens.add({
+      targets: searchContainer,
+      angle: { from: -15, to: 15 },
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // 脉冲动画
+    this.tweens.add({
+      targets: searchIcon,
+      scale: { from: 1, to: 1.1 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  private handleAction() {
+    if (this.isAttacking) return;
+
+    if (this.monster && this.battlePhase !== 'fighting' && this.onAttack) {
+      this.isAttacking = true;
+      this.playAttackAnimation();
+
+      // 更新连击
+      const now = Date.now();
+      if (now - this.lastAttackTime < 2000) {
+        this.comboCount++;
+        this.showCombo();
+      } else {
+        this.comboCount = 1;
+        this.showCombo();
+      }
+      this.lastAttackTime = now;
+
+      // 延迟触发攻击回调
+      this.time.delayedCall(150, () => {
+        if (this.onAttack) this.onAttack();
+        this.isAttacking = false;
+      });
+    } else if (this.canMine && this.onMine) {
+      this.playMiningEffect();
+      this.onMine();
+    }
+  }
+
+  private showCombo() {
+    const comboNumber = this.comboContainer.getByName('comboNumber') as Phaser.GameObjects.Text;
+    if (comboNumber) {
+      comboNumber.setText(this.comboCount.toString());
+    }
+
+    this.comboContainer.setVisible(true);
+    this.comboContainer.setScale(0.5);
+    this.comboContainer.setAlpha(0);
+
+    this.tweens.add({
+      targets: this.comboContainer,
+      scale: 1.2,
+      alpha: 1,
+      duration: 150,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: this.comboContainer,
+          scale: 1,
+          duration: 100,
+        });
+      },
+    });
+
+    // 连击超时隐藏
+    this.time.delayedCall(2000, () => {
+      if (Date.now() - this.lastAttackTime >= 1900) {
+        this.tweens.add({
+          targets: this.comboContainer,
+          alpha: 0,
+          duration: 300,
+          onComplete: () => {
+            this.comboContainer.setVisible(false);
+            this.comboCount = 0;
+          },
+        });
+      }
+    });
+  }
+
+  private updatePlayerHpBar() {
+    const width = this.cameras.main.width;
+    const barWidth = 80;
+    const barHeight = 8;
+    const x = width / 2 - barWidth / 2;
+    const y = this.cameras.main.height - 38;
+    const hpPercent = Math.max(0, this.playerHp / this.maxPlayerHp);
+
+    this.playerHpBar.clear();
+
+    // 背景
+    this.playerHpBar.fillStyle(0x000000, 0.7);
+    this.playerHpBar.fillRoundedRect(x - 3, y - 3, barWidth + 6, barHeight + 6, 4);
+
+    // 血条颜色根据血量变化
+    let barColor = 0x22c55e;
+    if (hpPercent < 0.3) barColor = 0xef4444;
+    else if (hpPercent < 0.6) barColor = 0xf59e0b;
+
+    // 血条
+    this.playerHpBar.fillStyle(barColor);
+    this.playerHpBar.fillRoundedRect(x, y, barWidth * hpPercent, barHeight, 3);
+
+    // 高光
+    this.playerHpBar.fillStyle(0xffffff, 0.3);
+    this.playerHpBar.fillRoundedRect(x, y, barWidth * hpPercent, barHeight / 2, { tl: 3, tr: 3, bl: 0, br: 0 });
+
+    // 边框
+    this.playerHpBar.lineStyle(2, 0xffffff, 0.6);
+    this.playerHpBar.strokeRoundedRect(x, y, barWidth, barHeight, 3);
+  }
+
+  private updateMonsterHpBar() {
+    if (!this.monster) return;
+
+    const width = this.cameras.main.width;
+    const barWidth = 100;
+    const barHeight = 10;
+    const x = width / 2 - barWidth / 2;
+    const y = 78;
+    const hpPercent = Math.max(0, this.monster.hp / this.monster.maxHp);
+
+    this.monsterHpBar.clear();
+
+    // 背景
+    this.monsterHpBar.fillStyle(0x000000, 0.7);
+    this.monsterHpBar.fillRoundedRect(x - 3, y - 3, barWidth + 6, barHeight + 6, 5);
+
+    // 血条颜色
+    let barColor = 0xef4444;
+    if (hpPercent < 0.3) barColor = 0x991b1b;
+
+    // 血条
+    this.monsterHpBar.fillStyle(barColor);
+    this.monsterHpBar.fillRoundedRect(x, y, barWidth * hpPercent, barHeight, 4);
+
+    // 高光
+    this.monsterHpBar.fillStyle(0xffffff, 0.25);
+    this.monsterHpBar.fillRoundedRect(x, y, barWidth * hpPercent, barHeight / 2, { tl: 4, tr: 4, bl: 0, br: 0 });
+
+    // 边框
+    this.monsterHpBar.lineStyle(2, 0xffffff, 0.5);
+    this.monsterHpBar.strokeRoundedRect(x, y, barWidth, barHeight, 4);
+
+    // 更新文字
+    this.monsterNameText.setText(this.monster.name);
+    this.monsterHpText.setText(`${this.monster.hp}/${this.monster.maxHp}`);
+    this.monsterStatsText.setText(`⚔️${this.monster.attack}  🛡️${this.monster.defense}`);
+  }
+
+  private updateMonsterAppearance() {
+    if (!this.monster) return;
+
+    const monsterBody = this.monsterSprite.getByName('monsterBody') as Phaser.GameObjects.Graphics;
+    const leftEye = this.monsterSprite.getByName('leftEye') as Phaser.GameObjects.Ellipse;
+    const rightEye = this.monsterSprite.getByName('rightEye') as Phaser.GameObjects.Ellipse;
+
+    if (!monsterBody) return;
+
+    // 根据怪物名称选择颜色和形状
+    let bodyColor = 0x4caf50;
+    let eyeColor = 0xffffff;
+    let bodySize = 80;
+
+    const name = this.monster.name;
+    if (name.includes('蝙蝠')) {
+      bodyColor = 0x5d4037;
+      eyeColor = 0xff5722;
+      bodySize = 70;
+    } else if (name.includes('蜘蛛') || name.includes('蝎子')) {
+      bodyColor = 0x37474f;
+      eyeColor = 0xf44336;
+      bodySize = 75;
+    } else if (name.includes('地精') || name.includes('蜥蜴')) {
+      bodyColor = 0x8bc34a;
+      bodySize = 75;
+    } else if (name.includes('骷髅') || name.includes('亡灵')) {
+      bodyColor = 0xeceff1;
+      eyeColor = 0xf44336;
+      bodySize = 70;
+    } else if (name.includes('巨人') || name.includes('魔像') || name.includes('石像')) {
+      bodyColor = 0x607d8b;
+      eyeColor = 0x03a9f4;
+      bodySize = 95;
+    } else if (name.includes('龙') || name.includes('熔岩') || name.includes('岩浆')) {
+      bodyColor = 0xd32f2f;
+      eyeColor = 0xffeb3b;
+      bodySize = 90;
+    } else if (name.includes('领主') || name.includes('虚空') || name.includes('暗影')) {
+      bodyColor = 0x4a148c;
+      eyeColor = 0xff1744;
+      bodySize = 100;
+    } else if (name.includes('狼')) {
+      bodyColor = 0x424242;
+      eyeColor = 0xffeb3b;
+      bodySize = 75;
+    } else if (name.includes('虫') || name.includes('老鼠')) {
+      bodyColor = 0x6d4c41;
+      bodySize = 60;
+    } else if (name.includes('泰坦') || name.includes('矿王')) {
+      bodyColor = 0xffd700;
+      eyeColor = 0xff1744;
+      bodySize = 100;
+    }
+
+    // 绘制怪物身体
+    monsterBody.clear();
+    monsterBody.fillStyle(bodyColor);
+    monsterBody.fillEllipse(0, 0, bodySize, bodySize);
+    // 高光
+    monsterBody.fillStyle(0xffffff, 0.15);
+    monsterBody.fillEllipse(-bodySize * 0.15, -bodySize * 0.15, bodySize * 0.4, bodySize * 0.3);
+
+    // 更新眼睛颜色
+    if (leftEye) leftEye.setFillStyle(eyeColor);
+    if (rightEye) rightEye.setFillStyle(eyeColor);
+  }
+
+  private updateVisibility() {
+    // 隐藏所有
+    this.monsterSprite.setVisible(false);
+    this.oreSprite.setVisible(false);
+    this.actionButton.setVisible(false);
+    this.defeatOverlay.setVisible(false);
+    this.idleContainer.setVisible(false);
+    this.monsterHpBar.setVisible(false);
+    this.monsterNameText.setVisible(false);
+    this.monsterHpText.setVisible(false);
+    this.monsterStatsText.setVisible(false);
+
+    if (this.battlePhase === 'defeat') {
+      this.defeatOverlay.setVisible(true);
+      this.comboContainer.setVisible(false);
+    } else if (this.monster) {
+      this.monsterSprite.setVisible(true);
+      this.actionButton.setVisible(true);
+      this.monsterHpBar.setVisible(true);
+      this.monsterNameText.setVisible(true);
+      this.monsterHpText.setVisible(true);
+      this.monsterStatsText.setVisible(true);
+      this.updateActionButton('attack');
+      this.updateMonsterAppearance();
+      this.updateMonsterHpBar();
+    } else if (this.canMine) {
+      this.oreSprite.setVisible(true);
+      this.actionButton.setVisible(true);
+      this.updateActionButton('mine');
+      this.comboContainer.setVisible(false);
+    } else {
+      this.idleContainer.setVisible(true);
+      this.comboContainer.setVisible(false);
+    }
+  }
+
+  private updateActionButton(type: 'attack' | 'mine') {
+    const btnBg = this.actionButton.getByName('btnBg') as Phaser.GameObjects.Graphics;
+    const btnText = this.actionButton.getByName('btnText') as Phaser.GameObjects.Text;
+
+    if (!btnBg || !btnText) return;
+
+    btnBg.clear();
+
+    if (type === 'attack') {
+      const color = this.battlePhase === 'fighting' ? 0x6b7280 : 0xef4444;
+      btnBg.fillStyle(color);
+      btnText.setText(this.battlePhase === 'fighting' ? '⏳ 战斗中...' : '⚔️ 攻击');
+    } else {
+      btnBg.fillStyle(0xf59e0b);
+      btnText.setText('⛏️ 挖矿');
+    }
+
+    btnBg.fillRoundedRect(-55, -18, 110, 38, 10);
+  }
+
+  private playAttackAnimation() {
+    // 玩家冲刺攻击
+    const originalY = this.playerSprite.y;
+    const originalX = this.playerSprite.x;
+
+    // 向前冲刺
+    this.tweens.add({
+      targets: this.playerSprite,
+      y: originalY - 50,
+      x: originalX,
+      duration: 100,
+      ease: 'Power2',
+      onComplete: () => {
+        // 挥剑动画
+        this.tweens.add({
+          targets: this.playerSword,
+          angle: 60,
+          duration: 80,
+          ease: 'Power3',
+          onComplete: () => {
+            // 剑气特效
+            this.slashEmitter.setPosition(this.playerSprite.x + 30, this.playerSprite.y - 30);
+            this.slashEmitter.explode(5);
+
+            // 恢复剑的位置
+            this.tweens.add({
+              targets: this.playerSword,
+              angle: -25,
+              duration: 200,
+              ease: 'Power2',
+            });
+          },
+        });
+
+        // 返回原位
+        this.tweens.add({
+          targets: this.playerSprite,
+          y: originalY,
+          duration: 150,
+          ease: 'Power2',
+          delay: 100,
+        });
+      },
+    });
+
+    // 屏幕震动
+    this.cameras.main.shake(120, 0.008);
+
+    // 攻击音效视觉反馈 - 屏幕闪白
+    this.cameras.main.flash(50, 255, 255, 255, false);
+  }
+
+  private playMonsterHitAnimation() {
+    const width = this.cameras.main.width;
+
+    // 怪物震动 - 更剧烈
+    this.tweens.add({
+      targets: this.monsterSprite,
+      x: { from: width / 2 - 15, to: width / 2 + 15 },
+      duration: 40,
+      yoyo: true,
+      repeat: 4,
+      ease: 'Power1',
+      onComplete: () => {
+        this.monsterSprite.x = width / 2;
+      },
+    });
+
+    // 怪物缩小弹回
+    this.tweens.add({
+      targets: this.monsterSprite,
+      scale: 0.85,
+      duration: 80,
+      yoyo: true,
+      ease: 'Power2',
+    });
+
+    // 血液粒子
+    this.bloodEmitter.setPosition(this.monsterSprite.x, this.monsterSprite.y);
+    this.bloodEmitter.explode(20);
+
+    // 闪烁效果
+    this.tweens.add({
+      targets: this.monsterSprite,
+      alpha: 0.4,
+      duration: 60,
+      yoyo: true,
+      repeat: 3,
+    });
+
+    // 魔法粒子（暴击效果）
+    if (this.comboCount >= 3) {
+      this.magicEmitter.setPosition(this.monsterSprite.x, this.monsterSprite.y);
+      this.magicEmitter.explode(15);
+    }
+  }
+
+  private playPlayerHitAnimation() {
+    const width = this.cameras.main.width;
+
+    // 玩家震动
+    this.tweens.add({
+      targets: this.playerSprite,
+      x: { from: width / 2 - 12, to: width / 2 + 12 },
+      duration: 50,
+      yoyo: true,
+      repeat: 3,
+      onComplete: () => {
+        this.playerSprite.x = width / 2;
+      },
+    });
+
+    // 血液粒子
+    this.bloodEmitter.setPosition(this.playerSprite.x, this.playerSprite.y - 20);
+    this.bloodEmitter.explode(12);
+
+    // 屏幕红闪
+    this.cameras.main.flash(250, 150, 0, 0, false);
+
+    // 屏幕震动
+    this.cameras.main.shake(150, 0.01);
+  }
+
+  private playMiningEffect() {
+    const width = this.cameras.main.width;
+
+    // 矿石震动 - 更剧烈
+    this.tweens.add({
+      targets: this.oreSprite,
+      x: { from: width / 2 - 8, to: width / 2 + 8 },
+      duration: 25,
+      yoyo: true,
+      repeat: 8,
+      onComplete: () => {
+        this.oreSprite.x = width / 2;
+      },
+    });
+
+    // 矿石缩放
+    this.tweens.add({
+      targets: this.oreSprite,
+      scale: 0.9,
+      duration: 100,
+      yoyo: true,
+    });
+
+    // 火花粒子
+    this.sparkEmitter.setPosition(this.oreSprite.x, this.oreSprite.y - 20);
+    this.sparkEmitter.explode(25);
+
+    // 岩石粒子
+    this.rockEmitter.setPosition(this.oreSprite.x, this.oreSprite.y);
+    this.rockEmitter.explode(15);
+
+    // 金币粒子
+    this.goldEmitter.setPosition(this.oreSprite.x, this.oreSprite.y - 30);
+    this.goldEmitter.explode(8);
+
+    // 屏幕震动
+    this.cameras.main.shake(180, 0.012);
+
+    // 屏幕闪黄
+    this.cameras.main.flash(80, 255, 200, 0, false);
+  }
+
+  private showDamageNumber(x: number, y: number, damage: number, isPlayerDamage: boolean) {
+    const color = isPlayerDamage ? '#ef4444' : '#fbbf24';
+    const prefix = isPlayerDamage ? '-' : '-';
+
+    // 主伤害数字
+    const damageText = this.add.text(x + Phaser.Math.Between(-25, 25), y, `${prefix}${damage}`, {
+      fontSize: this.comboCount >= 3 && !isPlayerDamage ? '32px' : '26px',
+      fontFamily: 'sans-serif',
+      color: color,
+      stroke: '#000000',
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+
+    // 暴击文字
+    if (this.comboCount >= 5 && !isPlayerDamage) {
+      const critText = this.add.text(x, y - 30, '暴击!', {
+        fontSize: '18px',
+        fontFamily: 'Microsoft YaHei, sans-serif',
+        color: '#ff6600',
+        stroke: '#000000',
+        strokeThickness: 3,
+      }).setOrigin(0.5);
+
+      this.tweens.add({
+        targets: critText,
+        y: y - 80,
+        alpha: 0,
+        scale: 1.5,
+        duration: 1000,
+        ease: 'Power2',
+        onComplete: () => critText.destroy(),
+      });
+    }
+
+    // 弹出动画
+    damageText.setScale(0.5);
+    this.tweens.add({
+      targets: damageText,
+      scale: 1.2,
+      duration: 100,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: damageText,
+          y: y - 60,
+          alpha: 0,
+          scale: 0.8,
+          duration: 700,
+          ease: 'Power2',
+          onComplete: () => damageText.destroy(),
+        });
+      },
+    });
+  }
+
+  // 显示获得物品
+  private showLootText(text: string) {
+    const width = this.cameras.main.width;
+    const lootText = this.add.text(width / 2, 320, text, {
+      fontSize: '16px',
+      fontFamily: 'Microsoft YaHei, sans-serif',
+      color: '#22c55e',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setOrigin(0.5);
+
+    this.tweens.add({
+      targets: lootText,
+      y: 280,
+      alpha: 0,
+      duration: 1500,
+      ease: 'Power2',
+      onComplete: () => lootText.destroy(),
+    });
+  }
+
+  // 外部调用更新方法
+  updateState(data: {
+    monster: Monster | null;
+    playerHp: number;
+    maxPlayerHp: number;
+    battlePhase: string;
+    canMine: boolean;
+  }) {
+    // 检测怪物伤害
+    if (data.monster && data.monster.hp < this.lastMonsterHp) {
+      const damage = this.lastMonsterHp - data.monster.hp;
+      this.showDamageNumber(this.monsterSprite.x, this.monsterSprite.y - 40, damage, false);
+      this.playMonsterHitAnimation();
+    }
+
+    // 检测玩家伤害
+    if (data.playerHp < this.lastPlayerHp) {
+      const damage = this.lastPlayerHp - data.playerHp;
+      this.showDamageNumber(this.playerSprite.x, this.playerSprite.y - 40, damage, true);
+      this.playPlayerHitAnimation();
+    }
+
+    // 检测怪物死亡
+    if (this.monster && !data.monster && data.canMine) {
+      this.showLootText('✨ 怪物已击败！');
+      this.goldEmitter.setPosition(this.monsterSprite.x, this.monsterSprite.y);
+      this.goldEmitter.explode(20);
+      this.comboCount = 0;
+    }
+
+    this.monster = data.monster;
+    this.playerHp = data.playerHp;
+    this.maxPlayerHp = data.maxPlayerHp;
+    this.battlePhase = data.battlePhase;
+    this.canMine = data.canMine;
+    this.lastMonsterHp = data.monster?.hp || 0;
+    this.lastPlayerHp = data.playerHp;
+
+    this.updateVisibility();
+    this.updatePlayerHpBar();
+    if (this.monster) {
+      this.updateMonsterHpBar();
+    }
+  }
+}
+
+export function PhaserBattle({
+  monster,
+  playerHp,
+  maxPlayerHp,
+  battlePhase,
+  canMine,
+  onAttack,
+  onMine,
+}: PhaserBattleProps) {
+  const gameRef = useRef<Phaser.Game | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<BattleScene | null>(null);
+
+  // 初始化游戏
+  useEffect(() => {
+    if (!containerRef.current || gameRef.current) return;
+
+    const config: Phaser.Types.Core.GameConfig = {
+      type: Phaser.AUTO,
+      parent: containerRef.current,
+      width: 600,
+      height: 400,
+      backgroundColor: '#1a1815',
+      scene: BattleScene,
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+      },
+      render: {
+        antialias: true,
+        pixelArt: false,
+      },
+      input: {
+        keyboard: true,
+        mouse: true,
+        touch: true,
+      },
+    };
+
+    gameRef.current = new Phaser.Game(config);
+
+    // 场景启动后获取引用并初始化
+    gameRef.current.events.once('ready', () => {
+      setTimeout(() => {
+        if (gameRef.current) {
+          const scene = gameRef.current.scene.getScene('BattleScene') as BattleScene;
+          if (scene) {
+            sceneRef.current = scene;
+            scene.scene.restart({
+              monster,
+              playerHp,
+              maxPlayerHp,
+              battlePhase,
+              canMine,
+              onAttack,
+              onMine,
+            });
+          }
+        }
+      }, 100);
+    });
+
+    return () => {
+      if (gameRef.current) {
+        gameRef.current.destroy(true);
+        gameRef.current = null;
+        sceneRef.current = null;
+      }
+    };
+  }, []);
+
+  // 更新游戏状态
+  useEffect(() => {
+    if (sceneRef.current) {
+      sceneRef.current.updateState({
+        monster,
+        playerHp,
+        maxPlayerHp,
+        battlePhase,
+        canMine,
+      });
+    } else if (gameRef.current) {
+      // 如果场景还没准备好，尝试重启
+      const scene = gameRef.current.scene.getScene('BattleScene') as BattleScene;
+      if (scene) {
+        sceneRef.current = scene;
+        scene.scene.restart({
+          monster,
+          playerHp,
+          maxPlayerHp,
+          battlePhase,
+          canMine,
+          onAttack,
+          onMine,
+        });
+      }
+    }
+  }, [monster, playerHp, maxPlayerHp, battlePhase, canMine, onAttack, onMine]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="w-full rounded-lg overflow-hidden cursor-pointer"
+      style={{ aspectRatio: '600 / 400' }}
+    />
+  );
+}

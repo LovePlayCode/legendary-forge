@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { cn } from '@/lib/utils';
 import { mineLevels } from '@/data/mine';
 import { Equipment, EquipmentSlot, equipmentCategoryMap, equipmentTypeNames } from '@/types/game';
-import { GiSwordman, GiShield, GiRing, GiWarPick, GiCrossedSwords, GiHearts, GiTwoCoins, GiMineExplosion, GiSkullCrossedBones, GiTreasureMap } from 'react-icons/gi';
+import { GiSwordman, GiShield, GiRing, GiCrossedSwords, GiHearts, GiMineExplosion, GiTreasureMap } from 'react-icons/gi';
+import { PhaserBattle } from './PhaserBattle';
 
 const qualityColors: Record<string, string> = {
   poor: 'text-gray-400',
@@ -286,76 +287,24 @@ export function MineView() {
           </CardContent>
         </Card>
 
-        {/* 战斗区域 */}
-        <Card className="bg-gradient-to-b from-stone-900/90 to-stone-800/90 backdrop-blur border-2 min-h-[300px]">
-          <CardContent className="py-6 flex flex-col items-center justify-center">
-            {mineState.battlePhase === 'defeat' ? (
-              <div className="text-center space-y-4">
-                <GiSkullCrossedBones className="text-6xl text-red-500 mx-auto animate-pulse" />
-                <h3 className="text-xl font-bold text-red-400">战斗失败</h3>
-                <p className="text-muted-foreground">你被击败了，需要恢复后再来</p>
-                <Button onClick={() => enterMine(mineState.currentLevel)}>
+        {/* Phaser 战斗区域 */}
+        <Card className="bg-gradient-to-b from-stone-900/90 to-stone-800/90 backdrop-blur border-2 overflow-hidden">
+          <CardContent className="p-2">
+            <PhaserBattle
+              monster={mineState.currentMonster}
+              playerHp={mineState.playerHp}
+              maxPlayerHp={mineState.maxPlayerHp}
+              battlePhase={mineState.battlePhase as 'idle' | 'fighting' | 'victory' | 'defeat' | 'mining'}
+              canMine={mineState.canMine}
+              onAttack={performBattle}
+              onMine={performMining}
+            />
+            {/* 失败时显示重新进入按钮 */}
+            {mineState.battlePhase === 'defeat' && (
+              <div className="flex justify-center mt-2">
+                <Button onClick={() => enterMine(mineState.currentLevel)} variant="destructive">
                   重新进入矿场
                 </Button>
-              </div>
-            ) : mineState.currentMonster ? (
-              <div className="text-center space-y-4 w-full">
-                {/* 怪物信息 */}
-                <div className="animate-bounce-in">
-                  <div className="w-24 h-24 mx-auto bg-red-900/30 rounded-full flex items-center justify-center border-2 border-red-500/50">
-                    <GiSkullCrossedBones className="text-5xl text-red-400" />
-                  </div>
-                  <h3 className="text-xl font-bold mt-3">{mineState.currentMonster.name}</h3>
-                  <div className="flex items-center justify-center gap-4 text-sm mt-2">
-                    <span className="text-red-400">⚔️ {mineState.currentMonster.attack}</span>
-                    <span className="text-blue-400">🛡️ {mineState.currentMonster.defense}</span>
-                    <span className="text-yellow-400">
-                      <GiTwoCoins className="inline mr-1" />
-                      {mineState.currentMonster.goldReward}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 怪物血条 */}
-                <div className="w-full max-w-xs mx-auto">
-                  <Progress
-                    value={(mineState.currentMonster.hp / mineState.currentMonster.maxHp) * 100}
-                    className="h-4"
-                  />
-                  <p className="text-xs text-center mt-1 text-muted-foreground">
-                    {mineState.currentMonster.hp} / {mineState.currentMonster.maxHp}
-                  </p>
-                </div>
-
-                {/* 战斗按钮 */}
-                <Button
-                  size="lg"
-                  className="mt-4"
-                  onClick={performBattle}
-                  disabled={mineState.battlePhase === 'fighting'}
-                >
-                  <GiCrossedSwords className="mr-2" />
-                  {mineState.battlePhase === 'fighting' ? '战斗中...' : '攻击'}
-                </Button>
-              </div>
-            ) : mineState.canMine ? (
-              <div className="text-center space-y-4">
-                <div className="w-24 h-24 mx-auto bg-amber-900/30 rounded-full flex items-center justify-center border-2 border-amber-500/50 animate-pulse">
-                  <GiWarPick className="text-5xl text-amber-400" />
-                </div>
-                <h3 className="text-xl font-bold text-amber-400">可以挖矿了！</h3>
-                <p className="text-muted-foreground">击败怪物后可以进行挖矿</p>
-                <Button size="lg" onClick={performMining} className="bg-amber-600 hover:bg-amber-700">
-                  <GiWarPick className="mr-2" />
-                  开始挖矿
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center space-y-4">
-                <div className="w-24 h-24 mx-auto bg-muted/30 rounded-full flex items-center justify-center border-2 border-muted-foreground/30">
-                  <GiMineExplosion className="text-5xl text-muted-foreground" />
-                </div>
-                <p className="text-muted-foreground">正在探索矿场...</p>
               </div>
             )}
           </CardContent>
