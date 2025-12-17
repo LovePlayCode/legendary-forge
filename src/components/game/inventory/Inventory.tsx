@@ -121,6 +121,9 @@ export function Inventory() {
       }
     });
 
+    // 增加金币
+    addGold(totalGold);
+
     toast({
       title: '批量出售成功',
       description: `共出售 ${selectedIds.size} 件物品，获得 ${totalGold} 金币`,
