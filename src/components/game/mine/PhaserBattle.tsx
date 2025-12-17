@@ -1,6 +1,17 @@
 import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 import { Monster } from '@/data/mine';
+import { 
+  generateKnightSprite, 
+  generateSlimeSprite, 
+  generateSkeletonSprite,
+  generateBatSprite,
+  generateGoblinSprite,
+  generateDragonSprite,
+  generateGolemSprite,
+  generateGhostSprite,
+  generateOreSprite,
+} from '@/utils/spriteGenerator';
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
@@ -126,6 +137,9 @@ class BattleScene extends Phaser.Scene {
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
 
+    // 创建精灵纹理
+    this.createSpriteTextures();
+
     // 创建粒子纹理
     this.createParticleTextures();
 
@@ -205,6 +219,39 @@ class BattleScene extends Phaser.Scene {
       delay: 100,
       callback: () => this.updateSkillCooldowns(),
       loop: true,
+    });
+  }
+
+  // 创建精灵纹理 - 使用像素艺术生成器
+  private createSpriteTextures() {
+    // 骑士精灵
+    if (!this.textures.exists('knight')) {
+      const knightCanvas = generateKnightSprite(64);
+      this.textures.addCanvas('knight', knightCanvas);
+    }
+
+    // 矿石精灵
+    if (!this.textures.exists('ore')) {
+      const oreCanvas = generateOreSprite(64);
+      this.textures.addCanvas('ore', oreCanvas);
+    }
+
+    // 怪物精灵
+    const monsterSprites = [
+      { key: 'slime', generator: () => generateSlimeSprite(48) },
+      { key: 'skeleton', generator: () => generateSkeletonSprite(56) },
+      { key: 'bat', generator: () => generateBatSprite(48) },
+      { key: 'goblin', generator: () => generateGoblinSprite(52) },
+      { key: 'dragon', generator: () => generateDragonSprite(72) },
+      { key: 'golem', generator: () => generateGolemSprite(64) },
+      { key: 'ghost', generator: () => generateGhostSprite(52) },
+    ];
+
+    monsterSprites.forEach(({ key, generator }) => {
+      if (!this.textures.exists(key)) {
+        const canvas = generator();
+        this.textures.addCanvas(key, canvas);
+      }
     });
   }
 
@@ -538,193 +585,56 @@ class BattleScene extends Phaser.Scene {
     const shadow = this.add.ellipse(0, 35, 60, 20, 0x000000, 0.4);
     this.playerSprite.add(shadow);
 
-    // 腿部容器 - 用于行走动画
+    // 使用像素艺术精灵图
+    const knightSprite = this.add.image(0, 0, 'knight');
+    knightSprite.setScale(1.5);
+    knightSprite.setName('knightBody');
+    this.playerSprite.add(knightSprite);
+
+    // 创建空的容器用于兼容动画系统
     this.playerLegs = this.add.container(0, 0);
-    
-    // 左腿
-    const leftLegUpper = this.add.rectangle(-10, 12, 12, 18, 0x1565c0);
-    const leftLegLower = this.add.rectangle(-10, 28, 10, 16, 0x0d47a1);
-    const leftBoot = this.add.rectangle(-10, 38, 14, 8, 0x5d4037);
-    leftLegUpper.setName('leftLegUpper');
-    leftLegLower.setName('leftLegLower');
-    
-    // 右腿
-    const rightLegUpper = this.add.rectangle(10, 12, 12, 18, 0x1565c0);
-    const rightLegLower = this.add.rectangle(10, 28, 10, 16, 0x0d47a1);
-    const rightBoot = this.add.rectangle(10, 38, 14, 8, 0x5d4037);
-    rightLegUpper.setName('rightLegUpper');
-    rightLegLower.setName('rightLegLower');
-    
-    this.playerLegs.add([leftLegUpper, leftLegLower, leftBoot, rightLegUpper, rightLegLower, rightBoot]);
     this.playerSprite.add(this.playerLegs);
 
-    // 身体 - 更精细的铠甲
-    const bodyContainer = this.add.container(0, 0);
-    
-    // 躯干基础
-    const torso = this.add.graphics();
-    torso.fillStyle(0x1976d2);
-    torso.fillRoundedRect(-24, -22, 48, 48, 8);
-    bodyContainer.add(torso);
-    
-    // 胸甲
-    const chestPlate = this.add.graphics();
-    chestPlate.fillStyle(0x78909c);
-    chestPlate.fillRoundedRect(-20, -18, 40, 35, 6);
-    chestPlate.fillStyle(0x90a4ae);
-    chestPlate.fillRoundedRect(-16, -14, 32, 26, 4);
-    // 胸甲装饰线
-    chestPlate.lineStyle(2, 0xb0bec5, 0.8);
-    chestPlate.beginPath();
-    chestPlate.moveTo(0, -14);
-    chestPlate.lineTo(0, 12);
-    chestPlate.strokePath();
-    bodyContainer.add(chestPlate);
-
-    // 腰带
-    const belt = this.add.rectangle(0, 18, 44, 8, 0x5d4037);
-    const beltBuckle = this.add.rectangle(0, 18, 12, 10, 0xffc107);
-    bodyContainer.add([belt, beltBuckle]);
-
-    this.playerSprite.add(bodyContainer);
-
-    // 肩甲 - 更立体
-    const leftShoulderPad = this.add.graphics();
-    leftShoulderPad.fillStyle(0x607d8b);
-    leftShoulderPad.fillEllipse(-28, -10, 18, 16);
-    leftShoulderPad.fillStyle(0x78909c);
-    leftShoulderPad.fillEllipse(-28, -12, 14, 12);
-    // 肩甲尖刺
-    leftShoulderPad.fillStyle(0x90a4ae);
-    leftShoulderPad.beginPath();
-    leftShoulderPad.moveTo(-28, -20);
-    leftShoulderPad.lineTo(-24, -12);
-    leftShoulderPad.lineTo(-32, -12);
-    leftShoulderPad.closePath();
-    leftShoulderPad.fillPath();
-    this.playerSprite.add(leftShoulderPad);
-
-    const rightShoulderPad = this.add.graphics();
-    rightShoulderPad.fillStyle(0x607d8b);
-    rightShoulderPad.fillEllipse(28, -10, 18, 16);
-    rightShoulderPad.fillStyle(0x78909c);
-    rightShoulderPad.fillEllipse(28, -12, 14, 12);
-    rightShoulderPad.fillStyle(0x90a4ae);
-    rightShoulderPad.beginPath();
-    rightShoulderPad.moveTo(28, -20);
-    rightShoulderPad.lineTo(24, -12);
-    rightShoulderPad.lineTo(32, -12);
-    rightShoulderPad.closePath();
-    rightShoulderPad.fillPath();
-    this.playerSprite.add(rightShoulderPad);
-
-    // 头盔 - 更精细
-    const helmetContainer = this.add.container(0, -35);
-    
-    // 头盔主体
-    const helmetBase = this.add.graphics();
-    helmetBase.fillStyle(0x607d8b);
-    helmetBase.fillEllipse(0, 0, 38, 32);
-    helmetBase.fillStyle(0x78909c);
-    helmetBase.fillEllipse(0, -2, 34, 28);
-    helmetContainer.add(helmetBase);
-    
-    // 头盔顶饰
-    const helmetCrest = this.add.graphics();
-    helmetCrest.fillStyle(0x90a4ae);
-    helmetCrest.fillRect(-4, -18, 8, 16);
-    helmetCrest.fillStyle(0xef4444);
-    helmetCrest.fillRect(-3, -22, 6, 8);
-    helmetContainer.add(helmetCrest);
-    
-    // 面罩
-    const visor = this.add.graphics();
-    visor.fillStyle(0x263238);
-    visor.fillRect(-12, -2, 24, 10);
-    // 面罩透气孔
-    visor.lineStyle(1, 0x37474f, 0.8);
-    for (let i = 0; i < 5; i++) {
-      visor.beginPath();
-      visor.moveTo(-10 + i * 5, 0);
-      visor.lineTo(-10 + i * 5, 6);
-      visor.strokePath();
-    }
-    helmetContainer.add(visor);
-    
-    // 眼睛发光效果
-    const leftEyeGlow = this.add.ellipse(-6, 2, 4, 3, 0x64b5f6, 0.8);
-    const rightEyeGlow = this.add.ellipse(6, 2, 4, 3, 0x64b5f6, 0.8);
-    helmetContainer.add([leftEyeGlow, rightEyeGlow]);
-    
-    // 眼睛发光动画
-    this.tweens.add({
-      targets: [leftEyeGlow, rightEyeGlow],
-      alpha: { from: 0.5, to: 1 },
-      duration: 800,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-    
-    this.playerSprite.add(helmetContainer);
-
-    // 剑 - 更精细的设计
+    // 剑容器 - 用于攻击动画
     this.playerSword = this.add.container(32, -8);
     
-    // 剑柄
-    const swordHandle = this.add.graphics();
-    swordHandle.fillStyle(0x5d4037);
-    swordHandle.fillRect(-3, 8, 6, 18);
-    // 剑柄缠绕
-    swordHandle.lineStyle(2, 0x8d6e63, 0.8);
-    for (let i = 0; i < 4; i++) {
-      swordHandle.beginPath();
-      swordHandle.moveTo(-3, 10 + i * 4);
-      swordHandle.lineTo(3, 12 + i * 4);
-      swordHandle.strokePath();
-    }
-    this.playerSword.add(swordHandle);
-    
-    // 护手
-    const crossguard = this.add.graphics();
-    crossguard.fillStyle(0xffc107);
-    crossguard.fillRect(-12, 4, 24, 6);
-    crossguard.fillStyle(0xffeb3b);
-    crossguard.fillRect(-10, 5, 20, 4);
-    this.playerSword.add(crossguard);
-    
+    // 剑 - 像素风格
+    const swordGraphics = this.add.graphics();
     // 剑身
-    const blade = this.add.graphics();
-    blade.fillStyle(0x90a4ae);
-    blade.fillRect(-5, -48, 10, 52);
-    blade.fillStyle(0xb0bec5);
-    blade.fillRect(-3, -48, 6, 52);
-    // 剑身中线
-    blade.fillStyle(0xeceff1);
-    blade.fillRect(-1, -46, 2, 48);
+    swordGraphics.fillStyle(0x90a4ae);
+    swordGraphics.fillRect(-3, -40, 6, 44);
+    swordGraphics.fillStyle(0xb0bec5);
+    swordGraphics.fillRect(-2, -40, 4, 44);
+    // 剑身中线高光
+    swordGraphics.fillStyle(0xeceff1);
+    swordGraphics.fillRect(-1, -38, 2, 40);
     // 剑尖
-    blade.fillStyle(0xb0bec5);
-    blade.beginPath();
-    blade.moveTo(-5, -48);
-    blade.lineTo(0, -60);
-    blade.lineTo(5, -48);
-    blade.closePath();
-    blade.fillPath();
-    this.playerSword.add(blade);
-    
+    swordGraphics.fillStyle(0xb0bec5);
+    swordGraphics.beginPath();
+    swordGraphics.moveTo(-3, -40);
+    swordGraphics.lineTo(0, -50);
+    swordGraphics.lineTo(3, -40);
+    swordGraphics.closePath();
+    swordGraphics.fillPath();
+    // 护手
+    swordGraphics.fillStyle(0xffc107);
+    swordGraphics.fillRect(-10, 2, 20, 4);
+    // 剑柄
+    swordGraphics.fillStyle(0x5d4037);
+    swordGraphics.fillRect(-2, 6, 4, 14);
     // 剑柄宝石
-    const pommel = this.add.circle(0, 28, 6, 0xffc107);
-    const pommelGem = this.add.circle(0, 28, 4, 0xe53935);
-    this.playerSword.add([pommel, pommelGem]);
+    swordGraphics.fillStyle(0xe53935);
+    swordGraphics.fillCircle(0, 22, 4);
+    this.playerSword.add(swordGraphics);
     
     // 剑身光效
-    const bladeGlow = this.add.rectangle(0, -25, 2, 40, 0xffffff, 0.3);
+    const bladeGlow = this.add.rectangle(0, -20, 2, 36, 0xffffff, 0.3);
     this.playerSword.add(bladeGlow);
     
     this.tweens.add({
       targets: bladeGlow,
-      alpha: { from: 0.1, to: 0.4 },
-      duration: 1000,
+      alpha: { from: 0.1, to: 0.5 },
+      duration: 800,
       yoyo: true,
       repeat: -1,
     });
@@ -732,50 +642,38 @@ class BattleScene extends Phaser.Scene {
     this.playerSword.setAngle(-25);
     this.playerSprite.add(this.playerSword);
 
-    // 盾牌 - 更精细
+    // 盾牌容器
     this.playerShield = this.add.container(-32, 0);
     
-    const shieldBase = this.add.graphics();
+    const shieldGraphics = this.add.graphics();
     // 盾牌主体
-    shieldBase.fillStyle(0x5d4037);
-    shieldBase.beginPath();
-    shieldBase.moveTo(0, -22);
-    shieldBase.lineTo(18, -12);
-    shieldBase.lineTo(18, 15);
-    shieldBase.lineTo(0, 28);
-    shieldBase.lineTo(-18, 15);
-    shieldBase.lineTo(-18, -12);
-    shieldBase.closePath();
-    shieldBase.fillPath();
-    // 盾牌边缘
-    shieldBase.fillStyle(0x8d6e63);
-    shieldBase.beginPath();
-    shieldBase.moveTo(0, -18);
-    shieldBase.lineTo(14, -9);
-    shieldBase.lineTo(14, 12);
-    shieldBase.lineTo(0, 23);
-    shieldBase.lineTo(-14, 12);
-    shieldBase.lineTo(-14, -9);
-    shieldBase.closePath();
-    shieldBase.fillPath();
-    this.playerShield.add(shieldBase);
-    
-    // 盾牌装饰
-    const shieldEmblem = this.add.graphics();
-    shieldEmblem.fillStyle(0xffc107);
-    shieldEmblem.fillCircle(0, 2, 12);
-    shieldEmblem.fillStyle(0xffeb3b);
-    shieldEmblem.fillCircle(0, 2, 8);
-    // 狮子图案（简化）
-    shieldEmblem.fillStyle(0xffa000);
-    shieldEmblem.fillCircle(0, 0, 5);
-    shieldEmblem.beginPath();
-    shieldEmblem.moveTo(-3, 3);
-    shieldEmblem.lineTo(0, 8);
-    shieldEmblem.lineTo(3, 3);
-    shieldEmblem.closePath();
-    shieldEmblem.fillPath();
-    this.playerShield.add(shieldEmblem);
+    shieldGraphics.fillStyle(0x5d4037);
+    shieldGraphics.beginPath();
+    shieldGraphics.moveTo(0, -18);
+    shieldGraphics.lineTo(14, -10);
+    shieldGraphics.lineTo(14, 12);
+    shieldGraphics.lineTo(0, 22);
+    shieldGraphics.lineTo(-14, 12);
+    shieldGraphics.lineTo(-14, -10);
+    shieldGraphics.closePath();
+    shieldGraphics.fillPath();
+    // 盾牌内部
+    shieldGraphics.fillStyle(0x8d6e63);
+    shieldGraphics.beginPath();
+    shieldGraphics.moveTo(0, -14);
+    shieldGraphics.lineTo(10, -7);
+    shieldGraphics.lineTo(10, 9);
+    shieldGraphics.lineTo(0, 17);
+    shieldGraphics.lineTo(-10, 9);
+    shieldGraphics.lineTo(-10, -7);
+    shieldGraphics.closePath();
+    shieldGraphics.fillPath();
+    // 盾牌徽章
+    shieldGraphics.fillStyle(0xffc107);
+    shieldGraphics.fillCircle(0, 2, 8);
+    shieldGraphics.fillStyle(0xffeb3b);
+    shieldGraphics.fillCircle(0, 2, 5);
+    this.playerShield.add(shieldGraphics);
     
     this.playerSprite.add(this.playerShield);
 
@@ -1124,6 +1022,29 @@ class BattleScene extends Phaser.Scene {
     };
   }
 
+  // 获取怪物对应的精灵纹理名称
+  private getMonsterSpriteKey(name: string): string | null {
+    const spriteMap: Record<string, string> = {
+      '蝙蝠': 'bat',
+      '史莱姆': 'slime',
+      '骷髅': 'skeleton',
+      '地精': 'goblin',
+      '龙': 'dragon',
+      '巨龙': 'dragon',
+      '魔像': 'golem',
+      '石魔': 'golem',
+      '幽灵': 'ghost',
+      '鬼魂': 'ghost',
+    };
+
+    for (const [key, spriteKey] of Object.entries(spriteMap)) {
+      if (name.includes(key)) {
+        return spriteKey;
+      }
+    }
+    return null;
+  }
+
   // 绘制详细的怪物
   private drawDetailedMonster(appearance: MonsterAppearance) {
     const width = this.cameras.main.width;
@@ -1131,7 +1052,7 @@ class BattleScene extends Phaser.Scene {
     // 清除旧的怪物身体
     this.monsterBody.removeAll(true);
 
-    const { bodyColor, secondaryColor, eyeColor, pupilColor, size, hasHorns, hasTail, hasWings, hasSpikes, glowColor } = appearance;
+    const { size, glowColor } = appearance;
 
     // 阴影
     const shadow = this.add.ellipse(0, size * 0.7, size * 1.2, size * 0.3, 0x000000, 0.4);
@@ -1149,6 +1070,47 @@ class BattleScene extends Phaser.Scene {
       yoyo: true,
       repeat: -1,
     });
+
+    // 尝试使用精灵图
+    const spriteKey = this.monster ? this.getMonsterSpriteKey(this.monster.name) : null;
+    
+    if (spriteKey && this.textures.exists(spriteKey)) {
+      // 使用精灵图
+      const monsterImage = this.add.image(0, 0, spriteKey);
+      const scale = size / 48; // 基于48像素的基础尺寸计算缩放
+      monsterImage.setScale(scale * 1.5);
+      monsterImage.setName('monsterImage');
+      this.monsterBody.add(monsterImage);
+
+      // 呼吸动画
+      this.tweens.add({
+        targets: monsterImage,
+        scaleY: { from: scale * 1.5, to: scale * 1.6 },
+        scaleX: { from: scale * 1.5, to: scale * 1.55 },
+        duration: 1000 * appearance.animationSpeed,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+
+      // 左右摇晃
+      this.tweens.add({
+        targets: this.monsterSprite,
+        x: { from: width / 2 - 5, to: width / 2 + 5 },
+        duration: 2000 * appearance.animationSpeed,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    } else {
+      // 回退到程序化绘制
+      this.drawProgrammaticMonster(appearance, width);
+    }
+  }
+
+  // 程序化绘制怪物（回退方案）
+  private drawProgrammaticMonster(appearance: MonsterAppearance, width: number) {
+    const { bodyColor, secondaryColor, eyeColor, pupilColor, size, hasHorns, hasTail, hasWings, hasSpikes } = appearance;
 
     // 翅膀（如果有）
     if (hasWings) {
@@ -1354,52 +1316,29 @@ class BattleScene extends Phaser.Scene {
     const shadow = this.add.ellipse(0, 50, 100, 25, 0x000000, 0.3);
     this.oreSprite.add(shadow);
 
-    // 矿石主体 - 更立体
-    const ore = this.add.graphics();
-    // 底层
-    ore.fillStyle(0x2d1f1a);
-    ore.beginPath();
-    ore.moveTo(-50, 30);
-    ore.lineTo(-60, -5);
-    ore.lineTo(-30, -50);
-    ore.lineTo(20, -55);
-    ore.lineTo(55, -20);
-    ore.lineTo(50, 28);
-    ore.lineTo(10, 40);
-    ore.closePath();
-    ore.fillPath();
-    // 高光面
-    ore.fillStyle(0x4e342e);
-    ore.beginPath();
-    ore.moveTo(-30, -50);
-    ore.lineTo(20, -55);
-    ore.lineTo(55, -20);
-    ore.lineTo(10, -15);
-    ore.closePath();
-    ore.fillPath();
-    this.oreSprite.add(ore);
+    // 使用像素艺术矿石精灵
+    const oreImage = this.add.image(0, 0, 'ore');
+    oreImage.setScale(1.8);
+    this.oreSprite.add(oreImage);
 
-    // 闪光点 - 更多更亮
+    // 额外闪光效果
     const sparklePositions = [
-      { x: -20, y: -22, size: 10, color: 0xffd700 },
-      { x: 15, y: -32, size: 12, color: 0xffcc00 },
-      { x: 28, y: -5, size: 8, color: 0xffd700 },
-      { x: -38, y: 0, size: 9, color: 0xffaa00 },
-      { x: 0, y: 8, size: 11, color: 0xffd700 },
-      { x: -15, y: -40, size: 7, color: 0xffee00 },
-      { x: 35, y: 15, size: 8, color: 0xffcc00 },
+      { x: -25, y: -30, size: 6 },
+      { x: 20, y: -35, size: 8 },
+      { x: 30, y: 5, size: 5 },
+      { x: -35, y: 10, size: 7 },
     ];
 
     sparklePositions.forEach((pos, i) => {
-      const sparkle = this.add.ellipse(pos.x, pos.y, pos.size, pos.size, pos.color, 0.9);
+      const sparkle = this.add.ellipse(pos.x, pos.y, pos.size, pos.size, 0xffffff, 0.9);
       this.oreSprite.add(sparkle);
 
       // 闪烁动画
       this.tweens.add({
         targets: sparkle,
-        alpha: { from: 0.5, to: 1 },
-        scale: { from: 0.7, to: 1.3 },
-        duration: 400 + i * 80,
+        alpha: { from: 0.3, to: 1 },
+        scale: { from: 0.5, to: 1.5 },
+        duration: 300 + i * 100,
         yoyo: true,
         repeat: -1,
         ease: 'Sine.easeInOut',
