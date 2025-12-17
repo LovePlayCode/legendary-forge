@@ -14,6 +14,21 @@ interface PhaserBattleProps {
   onMine: () => void;
 }
 
+// 怪物外观配置
+interface MonsterAppearance {
+  bodyColor: number;
+  secondaryColor: number;
+  eyeColor: number;
+  pupilColor: number;
+  size: number;
+  hasHorns: boolean;
+  hasTail: boolean;
+  hasWings: boolean;
+  hasSpikes: boolean;
+  glowColor: number;
+  animationSpeed: number;
+}
+
 // 战斗场景类
 class BattleScene extends Phaser.Scene {
   private monster: Monster | null = null;
@@ -27,9 +42,13 @@ class BattleScene extends Phaser.Scene {
   // 游戏对象
   private playerSprite!: Phaser.GameObjects.Container;
   private playerSword!: Phaser.GameObjects.Container;
+  private playerShield!: Phaser.GameObjects.Container;
+  private playerLegs!: Phaser.GameObjects.Container;
   private monsterSprite!: Phaser.GameObjects.Container;
+  private monsterBody!: Phaser.GameObjects.Container;
   private oreSprite!: Phaser.GameObjects.Container;
   private actionButton!: Phaser.GameObjects.Container;
+  private skillButtons!: Phaser.GameObjects.Container;
   private playerHpBar!: Phaser.GameObjects.Graphics;
   private monsterHpBar!: Phaser.GameObjects.Graphics;
   private monsterNameText!: Phaser.GameObjects.Text;
@@ -40,6 +59,7 @@ class BattleScene extends Phaser.Scene {
   private idleContainer!: Phaser.GameObjects.Container;
   private comboContainer!: Phaser.GameObjects.Container;
   private comboText!: Phaser.GameObjects.Text;
+  private battleLog!: Phaser.GameObjects.Container;
 
   // 粒子发射器
   private bloodEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -49,6 +69,8 @@ class BattleScene extends Phaser.Scene {
   private magicEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private goldEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private slashEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private healEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private shieldEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
 
   // 状态追踪
   private lastMonsterHp: number = 0;
@@ -56,10 +78,20 @@ class BattleScene extends Phaser.Scene {
   private comboCount: number = 0;
   private lastAttackTime: number = 0;
   private isAttacking: boolean = false;
+  private isBlocking: boolean = false;
+  private skillCooldowns: Record<string, number> = {};
+  private battleMessages: string[] = [];
+
+  // 原始位置记录
+  private playerOriginalX: number = 0;
+  private playerOriginalY: number = 0;
 
   // 环境效果
   private ambientParticles: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
   private backgroundGlow!: Phaser.GameObjects.Graphics;
+
+  // 当前怪物外观
+  private currentMonsterAppearance: MonsterAppearance | null = null;
 
   constructor() {
     super({ key: 'BattleScene' });
@@ -85,6 +117,9 @@ class BattleScene extends Phaser.Scene {
     this.lastPlayerHp = data.playerHp;
     this.comboCount = 0;
     this.isAttacking = false;
+    this.isBlocking = false;
+    this.skillCooldowns = { power: 0, block: 0, heal: 0 };
+    this.battleMessages = [];
   }
 
   create() {
@@ -118,8 +153,14 @@ class BattleScene extends Phaser.Scene {
     // 创建操作按钮
     this.createActionButton(width, height);
 
+    // 创建技能按钮
+    this.createSkillButtons(width, height);
+
     // 创建连击显示
     this.createComboDisplay(width, height);
+
+    // 创建战斗日志
+    this.createBattleLog(width, height);
 
     // 创建失败遮罩
     this.createDefeatOverlay(width, height);
@@ -135,15 +176,35 @@ class BattleScene extends Phaser.Scene {
       this.handleAction();
     });
 
+    this.input.keyboard?.on('keydown-Q', () => {
+      this.usePowerAttack();
+    });
+
+    this.input.keyboard?.on('keydown-W', () => {
+      this.useBlock();
+    });
+
+    this.input.keyboard?.on('keydown-E', () => {
+      this.useHeal();
+    });
+
     // 添加点击任意位置攻击
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       // 检查是否点击在按钮区域外
       const btnBounds = this.actionButton.getBounds();
-      if (!btnBounds.contains(pointer.x, pointer.y)) {
+      const skillBounds = this.skillButtons.getBounds();
+      if (!btnBounds.contains(pointer.x, pointer.y) && !skillBounds.contains(pointer.x, pointer.y)) {
         if (this.monster && this.battlePhase !== 'fighting' && !this.isAttacking) {
           this.handleAction();
         }
       }
+    });
+
+    // 技能冷却更新
+    this.time.addEvent({
+      delay: 100,
+      callback: () => this.updateSkillCooldowns(),
+      loop: true,
     });
   }
 
@@ -186,6 +247,39 @@ class BattleScene extends Phaser.Scene {
       g3.fillRect(0, 6, 32, 4);
       g3.generateTexture('slash', 32, 16);
       g3.destroy();
+    }
+
+    // 心形粒子（用于治疗）
+    if (!this.textures.exists('heart')) {
+      const g4 = this.add.graphics();
+      g4.fillStyle(0xffffff);
+      g4.fillCircle(5, 5, 4);
+      g4.fillCircle(11, 5, 4);
+      g4.beginPath();
+      g4.moveTo(1, 6);
+      g4.lineTo(8, 14);
+      g4.lineTo(15, 6);
+      g4.closePath();
+      g4.fillPath();
+      g4.generateTexture('heart', 16, 16);
+      g4.destroy();
+    }
+
+    // 盾形粒子
+    if (!this.textures.exists('shield')) {
+      const g5 = this.add.graphics();
+      g5.fillStyle(0xffffff);
+      g5.beginPath();
+      g5.moveTo(8, 0);
+      g5.lineTo(16, 4);
+      g5.lineTo(16, 10);
+      g5.lineTo(8, 16);
+      g5.lineTo(0, 10);
+      g5.lineTo(0, 4);
+      g5.closePath();
+      g5.fillPath();
+      g5.generateTexture('shield', 16, 16);
+      g5.destroy();
     }
   }
 
@@ -381,6 +475,28 @@ class BattleScene extends Phaser.Scene {
       tint: [0xaaddff, 0xffffff, 0x88ccff],
       emitting: false,
     });
+
+    // 治疗粒子
+    this.healEmitter = this.add.particles(0, 0, 'heart', {
+      speed: { min: 30, max: 80 },
+      angle: { min: 250, max: 290 },
+      scale: { start: 0.5, end: 0.2 },
+      lifespan: 1200,
+      alpha: { start: 1, end: 0 },
+      tint: [0x22c55e, 0x4ade80, 0x86efac],
+      emitting: false,
+    });
+
+    // 盾牌粒子
+    this.shieldEmitter = this.add.particles(0, 0, 'shield', {
+      speed: { min: 20, max: 60 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.6, end: 0 },
+      lifespan: 800,
+      alpha: { start: 0.8, end: 0 },
+      tint: [0x3b82f6, 0x60a5fa, 0x93c5fd],
+      emitting: false,
+    });
   }
 
   private createDustParticles(width: number, height: number) {
@@ -412,87 +528,261 @@ class BattleScene extends Phaser.Scene {
   }
 
   private createPlayer(width: number, height: number) {
-    this.playerSprite = this.add.container(width / 2, height - 85);
+    // 记录原始位置
+    this.playerOriginalX = width / 2;
+    this.playerOriginalY = height - 85;
+    
+    this.playerSprite = this.add.container(this.playerOriginalX, this.playerOriginalY);
 
     // 阴影
-    const shadow = this.add.ellipse(0, 30, 55, 18, 0x000000, 0.35);
+    const shadow = this.add.ellipse(0, 35, 60, 20, 0x000000, 0.4);
     this.playerSprite.add(shadow);
 
-    // 腿部
-    const leftLeg = this.add.rectangle(-8, 18, 10, 20, 0x1565c0);
-    const rightLeg = this.add.rectangle(8, 18, 10, 20, 0x1565c0);
-    this.playerSprite.add([leftLeg, rightLeg]);
+    // 腿部容器 - 用于行走动画
+    this.playerLegs = this.add.container(0, 0);
+    
+    // 左腿
+    const leftLegUpper = this.add.rectangle(-10, 12, 12, 18, 0x1565c0);
+    const leftLegLower = this.add.rectangle(-10, 28, 10, 16, 0x0d47a1);
+    const leftBoot = this.add.rectangle(-10, 38, 14, 8, 0x5d4037);
+    leftLegUpper.setName('leftLegUpper');
+    leftLegLower.setName('leftLegLower');
+    
+    // 右腿
+    const rightLegUpper = this.add.rectangle(10, 12, 12, 18, 0x1565c0);
+    const rightLegLower = this.add.rectangle(10, 28, 10, 16, 0x0d47a1);
+    const rightBoot = this.add.rectangle(10, 38, 14, 8, 0x5d4037);
+    rightLegUpper.setName('rightLegUpper');
+    rightLegLower.setName('rightLegLower');
+    
+    this.playerLegs.add([leftLegUpper, leftLegLower, leftBoot, rightLegUpper, rightLegLower, rightBoot]);
+    this.playerSprite.add(this.playerLegs);
 
-    // 身体
-    const body = this.add.graphics();
-    body.fillStyle(0x1976d2);
-    body.fillRoundedRect(-22, -20, 44, 45, 8);
-    body.fillStyle(0x42a5f5);
-    body.fillRoundedRect(-18, -15, 36, 35, 6);
-    this.playerSprite.add(body);
+    // 身体 - 更精细的铠甲
+    const bodyContainer = this.add.container(0, 0);
+    
+    // 躯干基础
+    const torso = this.add.graphics();
+    torso.fillStyle(0x1976d2);
+    torso.fillRoundedRect(-24, -22, 48, 48, 8);
+    bodyContainer.add(torso);
+    
+    // 胸甲
+    const chestPlate = this.add.graphics();
+    chestPlate.fillStyle(0x78909c);
+    chestPlate.fillRoundedRect(-20, -18, 40, 35, 6);
+    chestPlate.fillStyle(0x90a4ae);
+    chestPlate.fillRoundedRect(-16, -14, 32, 26, 4);
+    // 胸甲装饰线
+    chestPlate.lineStyle(2, 0xb0bec5, 0.8);
+    chestPlate.beginPath();
+    chestPlate.moveTo(0, -14);
+    chestPlate.lineTo(0, 12);
+    chestPlate.strokePath();
+    bodyContainer.add(chestPlate);
 
-    // 肩甲
-    const leftShoulder = this.add.ellipse(-25, -8, 14, 12, 0x78909c);
-    const rightShoulder = this.add.ellipse(25, -8, 14, 12, 0x78909c);
-    this.playerSprite.add([leftShoulder, rightShoulder]);
+    // 腰带
+    const belt = this.add.rectangle(0, 18, 44, 8, 0x5d4037);
+    const beltBuckle = this.add.rectangle(0, 18, 12, 10, 0xffc107);
+    bodyContainer.add([belt, beltBuckle]);
 
-    // 头盔
-    const helmet = this.add.graphics();
-    helmet.fillStyle(0x78909c);
-    helmet.fillEllipse(0, -32, 34, 26);
-    helmet.fillStyle(0x90a4ae);
-    helmet.fillRect(-3, -48, 6, 14);
+    this.playerSprite.add(bodyContainer);
+
+    // 肩甲 - 更立体
+    const leftShoulderPad = this.add.graphics();
+    leftShoulderPad.fillStyle(0x607d8b);
+    leftShoulderPad.fillEllipse(-28, -10, 18, 16);
+    leftShoulderPad.fillStyle(0x78909c);
+    leftShoulderPad.fillEllipse(-28, -12, 14, 12);
+    // 肩甲尖刺
+    leftShoulderPad.fillStyle(0x90a4ae);
+    leftShoulderPad.beginPath();
+    leftShoulderPad.moveTo(-28, -20);
+    leftShoulderPad.lineTo(-24, -12);
+    leftShoulderPad.lineTo(-32, -12);
+    leftShoulderPad.closePath();
+    leftShoulderPad.fillPath();
+    this.playerSprite.add(leftShoulderPad);
+
+    const rightShoulderPad = this.add.graphics();
+    rightShoulderPad.fillStyle(0x607d8b);
+    rightShoulderPad.fillEllipse(28, -10, 18, 16);
+    rightShoulderPad.fillStyle(0x78909c);
+    rightShoulderPad.fillEllipse(28, -12, 14, 12);
+    rightShoulderPad.fillStyle(0x90a4ae);
+    rightShoulderPad.beginPath();
+    rightShoulderPad.moveTo(28, -20);
+    rightShoulderPad.lineTo(24, -12);
+    rightShoulderPad.lineTo(32, -12);
+    rightShoulderPad.closePath();
+    rightShoulderPad.fillPath();
+    this.playerSprite.add(rightShoulderPad);
+
+    // 头盔 - 更精细
+    const helmetContainer = this.add.container(0, -35);
+    
+    // 头盔主体
+    const helmetBase = this.add.graphics();
+    helmetBase.fillStyle(0x607d8b);
+    helmetBase.fillEllipse(0, 0, 38, 32);
+    helmetBase.fillStyle(0x78909c);
+    helmetBase.fillEllipse(0, -2, 34, 28);
+    helmetContainer.add(helmetBase);
+    
+    // 头盔顶饰
+    const helmetCrest = this.add.graphics();
+    helmetCrest.fillStyle(0x90a4ae);
+    helmetCrest.fillRect(-4, -18, 8, 16);
+    helmetCrest.fillStyle(0xef4444);
+    helmetCrest.fillRect(-3, -22, 6, 8);
+    helmetContainer.add(helmetCrest);
+    
     // 面罩
-    helmet.fillStyle(0x37474f);
-    helmet.fillRect(-10, -32, 20, 8);
-    this.playerSprite.add(helmet);
+    const visor = this.add.graphics();
+    visor.fillStyle(0x263238);
+    visor.fillRect(-12, -2, 24, 10);
+    // 面罩透气孔
+    visor.lineStyle(1, 0x37474f, 0.8);
+    for (let i = 0; i < 5; i++) {
+      visor.beginPath();
+      visor.moveTo(-10 + i * 5, 0);
+      visor.lineTo(-10 + i * 5, 6);
+      visor.strokePath();
+    }
+    helmetContainer.add(visor);
+    
+    // 眼睛发光效果
+    const leftEyeGlow = this.add.ellipse(-6, 2, 4, 3, 0x64b5f6, 0.8);
+    const rightEyeGlow = this.add.ellipse(6, 2, 4, 3, 0x64b5f6, 0.8);
+    helmetContainer.add([leftEyeGlow, rightEyeGlow]);
+    
+    // 眼睛发光动画
+    this.tweens.add({
+      targets: [leftEyeGlow, rightEyeGlow],
+      alpha: { from: 0.5, to: 1 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    
+    this.playerSprite.add(helmetContainer);
 
-    // 剑 - 单独容器便于动画
-    this.playerSword = this.add.container(30, -5);
+    // 剑 - 更精细的设计
+    this.playerSword = this.add.container(32, -8);
+    
+    // 剑柄
+    const swordHandle = this.add.graphics();
+    swordHandle.fillStyle(0x5d4037);
+    swordHandle.fillRect(-3, 8, 6, 18);
+    // 剑柄缠绕
+    swordHandle.lineStyle(2, 0x8d6e63, 0.8);
+    for (let i = 0; i < 4; i++) {
+      swordHandle.beginPath();
+      swordHandle.moveTo(-3, 10 + i * 4);
+      swordHandle.lineTo(3, 12 + i * 4);
+      swordHandle.strokePath();
+    }
+    this.playerSword.add(swordHandle);
+    
+    // 护手
+    const crossguard = this.add.graphics();
+    crossguard.fillStyle(0xffc107);
+    crossguard.fillRect(-12, 4, 24, 6);
+    crossguard.fillStyle(0xffeb3b);
+    crossguard.fillRect(-10, 5, 20, 4);
+    this.playerSword.add(crossguard);
+    
+    // 剑身
     const blade = this.add.graphics();
+    blade.fillStyle(0x90a4ae);
+    blade.fillRect(-5, -48, 10, 52);
     blade.fillStyle(0xb0bec5);
-    blade.fillRect(-4, -45, 8, 45);
+    blade.fillRect(-3, -48, 6, 52);
+    // 剑身中线
     blade.fillStyle(0xeceff1);
-    blade.fillRect(-2, -45, 4, 45);
+    blade.fillRect(-1, -46, 2, 48);
     // 剑尖
     blade.fillStyle(0xb0bec5);
     blade.beginPath();
-    blade.moveTo(-4, -45);
-    blade.lineTo(0, -55);
-    blade.lineTo(4, -45);
+    blade.moveTo(-5, -48);
+    blade.lineTo(0, -60);
+    blade.lineTo(5, -48);
     blade.closePath();
     blade.fillPath();
     this.playerSword.add(blade);
-
-    const hilt = this.add.rectangle(0, 5, 20, 8, 0x795548);
-    const pommel = this.add.circle(0, 12, 5, 0xffc107);
-    this.playerSword.add([hilt, pommel]);
+    
+    // 剑柄宝石
+    const pommel = this.add.circle(0, 28, 6, 0xffc107);
+    const pommelGem = this.add.circle(0, 28, 4, 0xe53935);
+    this.playerSword.add([pommel, pommelGem]);
+    
+    // 剑身光效
+    const bladeGlow = this.add.rectangle(0, -25, 2, 40, 0xffffff, 0.3);
+    this.playerSword.add(bladeGlow);
+    
+    this.tweens.add({
+      targets: bladeGlow,
+      alpha: { from: 0.1, to: 0.4 },
+      duration: 1000,
+      yoyo: true,
+      repeat: -1,
+    });
+    
     this.playerSword.setAngle(-25);
     this.playerSprite.add(this.playerSword);
 
-    // 盾牌
-    const shield = this.add.graphics();
-    shield.fillStyle(0x5d4037);
-    shield.beginPath();
-    shield.moveTo(-28, -15);
-    shield.lineTo(-12, -8);
-    shield.lineTo(-12, 18);
-    shield.lineTo(-28, 25);
-    shield.lineTo(-44, 18);
-    shield.lineTo(-44, -8);
-    shield.closePath();
-    shield.fillPath();
+    // 盾牌 - 更精细
+    this.playerShield = this.add.container(-32, 0);
+    
+    const shieldBase = this.add.graphics();
+    // 盾牌主体
+    shieldBase.fillStyle(0x5d4037);
+    shieldBase.beginPath();
+    shieldBase.moveTo(0, -22);
+    shieldBase.lineTo(18, -12);
+    shieldBase.lineTo(18, 15);
+    shieldBase.lineTo(0, 28);
+    shieldBase.lineTo(-18, 15);
+    shieldBase.lineTo(-18, -12);
+    shieldBase.closePath();
+    shieldBase.fillPath();
+    // 盾牌边缘
+    shieldBase.fillStyle(0x8d6e63);
+    shieldBase.beginPath();
+    shieldBase.moveTo(0, -18);
+    shieldBase.lineTo(14, -9);
+    shieldBase.lineTo(14, 12);
+    shieldBase.lineTo(0, 23);
+    shieldBase.lineTo(-14, 12);
+    shieldBase.lineTo(-14, -9);
+    shieldBase.closePath();
+    shieldBase.fillPath();
+    this.playerShield.add(shieldBase);
+    
     // 盾牌装饰
-    shield.fillStyle(0xffc107);
-    shield.fillCircle(-28, 6, 10);
-    shield.fillStyle(0xffeb3b);
-    shield.fillCircle(-28, 6, 6);
-    this.playerSprite.add(shield);
+    const shieldEmblem = this.add.graphics();
+    shieldEmblem.fillStyle(0xffc107);
+    shieldEmblem.fillCircle(0, 2, 12);
+    shieldEmblem.fillStyle(0xffeb3b);
+    shieldEmblem.fillCircle(0, 2, 8);
+    // 狮子图案（简化）
+    shieldEmblem.fillStyle(0xffa000);
+    shieldEmblem.fillCircle(0, 0, 5);
+    shieldEmblem.beginPath();
+    shieldEmblem.moveTo(-3, 3);
+    shieldEmblem.lineTo(0, 8);
+    shieldEmblem.lineTo(3, 3);
+    shieldEmblem.closePath();
+    shieldEmblem.fillPath();
+    this.playerShield.add(shieldEmblem);
+    
+    this.playerSprite.add(this.playerShield);
 
-    // 待机动画
+    // 待机动画 - 呼吸效果
     this.tweens.add({
       targets: this.playerSprite,
-      scaleY: { from: 1, to: 1.015 },
+      scaleY: { from: 1, to: 1.02 },
       duration: 1200,
       yoyo: true,
       repeat: -1,
@@ -509,6 +799,16 @@ class BattleScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
     });
 
+    // 盾牌轻微移动
+    this.tweens.add({
+      targets: this.playerShield,
+      y: { from: 0, to: 2 },
+      duration: 1300,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
     // 玩家血条
     this.playerHpBar = this.add.graphics();
     this.updatePlayerHpBar();
@@ -518,57 +818,9 @@ class BattleScene extends Phaser.Scene {
     this.monsterSprite = this.add.container(width / 2, 155);
     this.monsterSprite.setVisible(false);
 
-    // 阴影
-    const shadow = this.add.ellipse(0, 60, 90, 25, 0x000000, 0.35);
-    shadow.setName('shadow');
-    this.monsterSprite.add(shadow);
-
-    // 怪物身体（将根据类型动态更新）
-    const monsterBody = this.add.graphics();
-    monsterBody.setName('monsterBody');
-    this.monsterSprite.add(monsterBody);
-
-    // 眼睛
-    const leftEye = this.add.ellipse(-18, -12, 18, 18, 0xffffff);
-    const rightEye = this.add.ellipse(18, -12, 18, 18, 0xffffff);
-    const leftPupil = this.add.ellipse(-16, -12, 8, 8, 0x000000);
-    const rightPupil = this.add.ellipse(20, -12, 8, 8, 0x000000);
-    leftEye.setName('leftEye');
-    rightEye.setName('rightEye');
-    leftPupil.setName('leftPupil');
-    rightPupil.setName('rightPupil');
-    this.monsterSprite.add([leftEye, rightEye, leftPupil, rightPupil]);
-
-    // 呼吸动画
-    this.tweens.add({
-      targets: this.monsterSprite,
-      scaleY: { from: 1, to: 1.04 },
-      scaleX: { from: 1, to: 1.03 },
-      duration: 1000,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-
-    // 眼睛跟踪玩家
-    this.tweens.add({
-      targets: [leftPupil, rightPupil],
-      y: '+=4',
-      duration: 1500,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-
-    // 左右摇晃
-    this.tweens.add({
-      targets: this.monsterSprite,
-      x: { from: width / 2 - 5, to: width / 2 + 5 },
-      duration: 2000,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
+    // 怪物身体容器
+    this.monsterBody = this.add.container(0, 0);
+    this.monsterSprite.add(this.monsterBody);
 
     // 怪物名字
     this.monsterNameText = this.add.text(width / 2, 55, '', {
@@ -595,6 +847,503 @@ class BattleScene extends Phaser.Scene {
       fontFamily: 'sans-serif',
       color: '#999999',
     }).setOrigin(0.5);
+  }
+
+  // 获取怪物外观配置
+  private getMonsterAppearance(name: string): MonsterAppearance {
+    const appearances: Record<string, MonsterAppearance> = {
+      '蝙蝠': {
+        bodyColor: 0x5d4037,
+        secondaryColor: 0x3e2723,
+        eyeColor: 0xff5722,
+        pupilColor: 0x000000,
+        size: 65,
+        hasHorns: false,
+        hasTail: false,
+        hasWings: true,
+        hasSpikes: false,
+        glowColor: 0xff5722,
+        animationSpeed: 0.8,
+      },
+      '史莱姆': {
+        bodyColor: 0x4caf50,
+        secondaryColor: 0x388e3c,
+        eyeColor: 0xffffff,
+        pupilColor: 0x000000,
+        size: 70,
+        hasHorns: false,
+        hasTail: false,
+        hasWings: false,
+        hasSpikes: false,
+        glowColor: 0x4caf50,
+        animationSpeed: 1.2,
+      },
+      '老鼠': {
+        bodyColor: 0x6d4c41,
+        secondaryColor: 0x4e342e,
+        eyeColor: 0xff1744,
+        pupilColor: 0x000000,
+        size: 55,
+        hasHorns: false,
+        hasTail: true,
+        hasWings: false,
+        hasSpikes: false,
+        glowColor: 0x6d4c41,
+        animationSpeed: 1.5,
+      },
+      '蜘蛛': {
+        bodyColor: 0x37474f,
+        secondaryColor: 0x263238,
+        eyeColor: 0xf44336,
+        pupilColor: 0x000000,
+        size: 70,
+        hasHorns: false,
+        hasTail: false,
+        hasWings: false,
+        hasSpikes: true,
+        glowColor: 0xf44336,
+        animationSpeed: 1.0,
+      },
+      '地精': {
+        bodyColor: 0x8bc34a,
+        secondaryColor: 0x689f38,
+        eyeColor: 0xffeb3b,
+        pupilColor: 0x000000,
+        size: 75,
+        hasHorns: false,
+        hasTail: false,
+        hasWings: false,
+        hasSpikes: false,
+        glowColor: 0x8bc34a,
+        animationSpeed: 1.0,
+      },
+      '蜥蜴': {
+        bodyColor: 0x7cb342,
+        secondaryColor: 0x558b2f,
+        eyeColor: 0xffeb3b,
+        pupilColor: 0x000000,
+        size: 75,
+        hasHorns: true,
+        hasTail: true,
+        hasWings: false,
+        hasSpikes: true,
+        glowColor: 0x7cb342,
+        animationSpeed: 0.9,
+      },
+      '巨虫': {
+        bodyColor: 0x795548,
+        secondaryColor: 0x5d4037,
+        eyeColor: 0xffc107,
+        pupilColor: 0x000000,
+        size: 80,
+        hasHorns: false,
+        hasTail: false,
+        hasWings: false,
+        hasSpikes: true,
+        glowColor: 0x795548,
+        animationSpeed: 0.7,
+      },
+      '狼': {
+        bodyColor: 0x424242,
+        secondaryColor: 0x212121,
+        eyeColor: 0xffeb3b,
+        pupilColor: 0x000000,
+        size: 75,
+        hasHorns: false,
+        hasTail: true,
+        hasWings: false,
+        hasSpikes: false,
+        glowColor: 0x424242,
+        animationSpeed: 1.2,
+      },
+      '石像鬼': {
+        bodyColor: 0x607d8b,
+        secondaryColor: 0x455a64,
+        eyeColor: 0x03a9f4,
+        pupilColor: 0x000000,
+        size: 85,
+        hasHorns: true,
+        hasTail: false,
+        hasWings: true,
+        hasSpikes: true,
+        glowColor: 0x03a9f4,
+        animationSpeed: 0.6,
+      },
+      '熔岩': {
+        bodyColor: 0xd32f2f,
+        secondaryColor: 0xb71c1c,
+        eyeColor: 0xffeb3b,
+        pupilColor: 0xff6f00,
+        size: 85,
+        hasHorns: true,
+        hasTail: false,
+        hasWings: false,
+        hasSpikes: true,
+        glowColor: 0xff6f00,
+        animationSpeed: 0.8,
+      },
+      '骷髅': {
+        bodyColor: 0xeceff1,
+        secondaryColor: 0xcfd8dc,
+        eyeColor: 0xf44336,
+        pupilColor: 0x000000,
+        size: 75,
+        hasHorns: false,
+        hasTail: false,
+        hasWings: false,
+        hasSpikes: false,
+        glowColor: 0xf44336,
+        animationSpeed: 0.9,
+      },
+      '蝎子': {
+        bodyColor: 0x4e342e,
+        secondaryColor: 0x3e2723,
+        eyeColor: 0xff5722,
+        pupilColor: 0x000000,
+        size: 80,
+        hasHorns: false,
+        hasTail: true,
+        hasWings: false,
+        hasSpikes: true,
+        glowColor: 0xff5722,
+        animationSpeed: 1.0,
+      },
+      '巨人': {
+        bodyColor: 0x607d8b,
+        secondaryColor: 0x455a64,
+        eyeColor: 0x03a9f4,
+        pupilColor: 0x000000,
+        size: 95,
+        hasHorns: false,
+        hasTail: false,
+        hasWings: false,
+        hasSpikes: false,
+        glowColor: 0x03a9f4,
+        animationSpeed: 0.5,
+      },
+      '魔像': {
+        bodyColor: 0x9c27b0,
+        secondaryColor: 0x7b1fa2,
+        eyeColor: 0x00e5ff,
+        pupilColor: 0x000000,
+        size: 90,
+        hasHorns: false,
+        hasTail: false,
+        hasWings: false,
+        hasSpikes: true,
+        glowColor: 0x00e5ff,
+        animationSpeed: 0.4,
+      },
+      '领主': {
+        bodyColor: 0x4a148c,
+        secondaryColor: 0x311b92,
+        eyeColor: 0xff1744,
+        pupilColor: 0x000000,
+        size: 100,
+        hasHorns: true,
+        hasTail: true,
+        hasWings: true,
+        hasSpikes: true,
+        glowColor: 0xff1744,
+        animationSpeed: 0.7,
+      },
+      '龙': {
+        bodyColor: 0xc62828,
+        secondaryColor: 0x8e0000,
+        eyeColor: 0xffd600,
+        pupilColor: 0x000000,
+        size: 95,
+        hasHorns: true,
+        hasTail: true,
+        hasWings: true,
+        hasSpikes: true,
+        glowColor: 0xffd600,
+        animationSpeed: 0.6,
+      },
+      '守护者': {
+        bodyColor: 0x1565c0,
+        secondaryColor: 0x0d47a1,
+        eyeColor: 0x00e5ff,
+        pupilColor: 0x000000,
+        size: 100,
+        hasHorns: true,
+        hasTail: false,
+        hasWings: false,
+        hasSpikes: true,
+        glowColor: 0x00e5ff,
+        animationSpeed: 0.4,
+      },
+      '泰坦': {
+        bodyColor: 0xffd700,
+        secondaryColor: 0xffa000,
+        eyeColor: 0xff1744,
+        pupilColor: 0x000000,
+        size: 105,
+        hasHorns: true,
+        hasTail: false,
+        hasWings: false,
+        hasSpikes: true,
+        glowColor: 0xff1744,
+        animationSpeed: 0.3,
+      },
+      '虚空': {
+        bodyColor: 0x1a1a2e,
+        secondaryColor: 0x0f0f1a,
+        eyeColor: 0xe040fb,
+        pupilColor: 0x000000,
+        size: 100,
+        hasHorns: true,
+        hasTail: true,
+        hasWings: true,
+        hasSpikes: true,
+        glowColor: 0xe040fb,
+        animationSpeed: 0.5,
+      },
+    };
+
+    // 查找匹配的外观
+    for (const [key, appearance] of Object.entries(appearances)) {
+      if (name.includes(key)) {
+        return appearance;
+      }
+    }
+
+    // 默认外观
+    return {
+      bodyColor: 0x4caf50,
+      secondaryColor: 0x388e3c,
+      eyeColor: 0xffffff,
+      pupilColor: 0x000000,
+      size: 75,
+      hasHorns: false,
+      hasTail: false,
+      hasWings: false,
+      hasSpikes: false,
+      glowColor: 0x4caf50,
+      animationSpeed: 1.0,
+    };
+  }
+
+  // 绘制详细的怪物
+  private drawDetailedMonster(appearance: MonsterAppearance) {
+    const width = this.cameras.main.width;
+    
+    // 清除旧的怪物身体
+    this.monsterBody.removeAll(true);
+
+    const { bodyColor, secondaryColor, eyeColor, pupilColor, size, hasHorns, hasTail, hasWings, hasSpikes, glowColor } = appearance;
+
+    // 阴影
+    const shadow = this.add.ellipse(0, size * 0.7, size * 1.2, size * 0.3, 0x000000, 0.4);
+    this.monsterBody.add(shadow);
+
+    // 光晕效果
+    const glow = this.add.ellipse(0, 0, size * 1.4, size * 1.4, glowColor, 0.15);
+    this.monsterBody.add(glow);
+    
+    this.tweens.add({
+      targets: glow,
+      alpha: { from: 0.1, to: 0.25 },
+      scale: { from: 1, to: 1.1 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    // 翅膀（如果有）
+    if (hasWings) {
+      const leftWing = this.add.graphics();
+      leftWing.fillStyle(secondaryColor, 0.8);
+      leftWing.beginPath();
+      leftWing.moveTo(-size * 0.4, -size * 0.1);
+      leftWing.lineTo(-size * 0.9, -size * 0.5);
+      leftWing.lineTo(-size * 0.8, 0);
+      leftWing.lineTo(-size * 0.6, size * 0.2);
+      leftWing.closePath();
+      leftWing.fillPath();
+      leftWing.setName('leftWing');
+      this.monsterBody.add(leftWing);
+
+      const rightWing = this.add.graphics();
+      rightWing.fillStyle(secondaryColor, 0.8);
+      rightWing.beginPath();
+      rightWing.moveTo(size * 0.4, -size * 0.1);
+      rightWing.lineTo(size * 0.9, -size * 0.5);
+      rightWing.lineTo(size * 0.8, 0);
+      rightWing.lineTo(size * 0.6, size * 0.2);
+      rightWing.closePath();
+      rightWing.fillPath();
+      rightWing.setName('rightWing');
+      this.monsterBody.add(rightWing);
+
+      // 翅膀动画
+      this.tweens.add({
+        targets: [leftWing, rightWing],
+        scaleY: { from: 1, to: 0.8 },
+        duration: 200,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
+
+    // 尾巴（如果有）
+    if (hasTail) {
+      const tail = this.add.graphics();
+      tail.fillStyle(bodyColor);
+      tail.beginPath();
+      tail.moveTo(size * 0.3, size * 0.3);
+      tail.lineTo(size * 0.5, size * 0.4);
+      tail.lineTo(size * 0.7, size * 0.2);
+      tail.lineTo(size * 0.6, size * 0.1);
+      tail.lineTo(size * 0.4, size * 0.25);
+      tail.lineTo(size * 0.3, size * 0.35);
+      tail.closePath();
+      tail.fillPath();
+      // 尾巴尖端
+      tail.fillStyle(secondaryColor);
+      tail.fillCircle(size * 0.65, size * 0.15, 6);
+      tail.setName('tail');
+      this.monsterBody.add(tail);
+
+      this.tweens.add({
+        targets: tail,
+        angle: { from: -5, to: 5 },
+        duration: 500,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
+
+    // 主体
+    const body = this.add.graphics();
+    body.fillStyle(bodyColor);
+    body.fillEllipse(0, 0, size, size * 0.9);
+    // 高光
+    body.fillStyle(0xffffff, 0.15);
+    body.fillEllipse(-size * 0.15, -size * 0.15, size * 0.4, size * 0.3);
+    this.monsterBody.add(body);
+
+    // 次要颜色装饰
+    const bodyDetail = this.add.graphics();
+    bodyDetail.fillStyle(secondaryColor);
+    bodyDetail.fillEllipse(0, size * 0.15, size * 0.7, size * 0.5);
+    this.monsterBody.add(bodyDetail);
+
+    // 尖刺（如果有）
+    if (hasSpikes) {
+      const spikes = this.add.graphics();
+      spikes.fillStyle(secondaryColor);
+      const spikeCount = 5;
+      for (let i = 0; i < spikeCount; i++) {
+        const angle = (-90 + (i - 2) * 25) * Math.PI / 180;
+        const baseX = Math.cos(angle) * size * 0.4;
+        const baseY = Math.sin(angle) * size * 0.35 - size * 0.1;
+        const tipX = Math.cos(angle) * size * 0.65;
+        const tipY = Math.sin(angle) * size * 0.55 - size * 0.1;
+        
+        spikes.beginPath();
+        spikes.moveTo(baseX - 4, baseY);
+        spikes.lineTo(tipX, tipY);
+        spikes.lineTo(baseX + 4, baseY);
+        spikes.closePath();
+        spikes.fillPath();
+      }
+      this.monsterBody.add(spikes);
+    }
+
+    // 角（如果有）
+    if (hasHorns) {
+      const leftHorn = this.add.graphics();
+      leftHorn.fillStyle(secondaryColor);
+      leftHorn.beginPath();
+      leftHorn.moveTo(-size * 0.25, -size * 0.35);
+      leftHorn.lineTo(-size * 0.4, -size * 0.7);
+      leftHorn.lineTo(-size * 0.15, -size * 0.35);
+      leftHorn.closePath();
+      leftHorn.fillPath();
+      this.monsterBody.add(leftHorn);
+
+      const rightHorn = this.add.graphics();
+      rightHorn.fillStyle(secondaryColor);
+      rightHorn.beginPath();
+      rightHorn.moveTo(size * 0.25, -size * 0.35);
+      rightHorn.lineTo(size * 0.4, -size * 0.7);
+      rightHorn.lineTo(size * 0.15, -size * 0.35);
+      rightHorn.closePath();
+      rightHorn.fillPath();
+      this.monsterBody.add(rightHorn);
+    }
+
+    // 眼睛
+    const eyeSpacing = size * 0.22;
+    const eyeY = -size * 0.1;
+    const eyeSize = size * 0.18;
+
+    // 左眼
+    const leftEyeWhite = this.add.ellipse(-eyeSpacing, eyeY, eyeSize, eyeSize, eyeColor);
+    const leftPupil = this.add.ellipse(-eyeSpacing + 2, eyeY, eyeSize * 0.5, eyeSize * 0.5, pupilColor);
+    leftPupil.setName('leftPupil');
+    
+    // 右眼
+    const rightEyeWhite = this.add.ellipse(eyeSpacing, eyeY, eyeSize, eyeSize, eyeColor);
+    const rightPupil = this.add.ellipse(eyeSpacing + 2, eyeY, eyeSize * 0.5, eyeSize * 0.5, pupilColor);
+    rightPupil.setName('rightPupil');
+    
+    this.monsterBody.add([leftEyeWhite, leftPupil, rightEyeWhite, rightPupil]);
+
+    // 眼睛发光
+    const leftEyeGlow = this.add.ellipse(-eyeSpacing, eyeY, eyeSize * 0.3, eyeSize * 0.3, 0xffffff, 0.6);
+    leftEyeGlow.setPosition(-eyeSpacing - eyeSize * 0.2, eyeY - eyeSize * 0.2);
+    const rightEyeGlow = this.add.ellipse(eyeSpacing, eyeY, eyeSize * 0.3, eyeSize * 0.3, 0xffffff, 0.6);
+    rightEyeGlow.setPosition(eyeSpacing - eyeSize * 0.2, eyeY - eyeSize * 0.2);
+    this.monsterBody.add([leftEyeGlow, rightEyeGlow]);
+
+    // 嘴巴
+    const mouth = this.add.graphics();
+    mouth.fillStyle(0x000000, 0.8);
+    mouth.fillEllipse(0, size * 0.2, size * 0.3, size * 0.12);
+    // 牙齿
+    mouth.fillStyle(0xffffff);
+    mouth.beginPath();
+    mouth.moveTo(-size * 0.1, size * 0.15);
+    mouth.lineTo(-size * 0.05, size * 0.22);
+    mouth.lineTo(0, size * 0.15);
+    mouth.lineTo(size * 0.05, size * 0.22);
+    mouth.lineTo(size * 0.1, size * 0.15);
+    mouth.closePath();
+    mouth.fillPath();
+    this.monsterBody.add(mouth);
+
+    // 呼吸动画
+    this.tweens.add({
+      targets: this.monsterBody,
+      scaleY: { from: 1, to: 1.05 },
+      scaleX: { from: 1, to: 1.03 },
+      duration: 1000 * appearance.animationSpeed,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // 眼睛跟踪玩家
+    this.tweens.add({
+      targets: [leftPupil, rightPupil],
+      y: eyeY + 4,
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // 左右摇晃
+    this.tweens.add({
+      targets: this.monsterSprite,
+      x: { from: width / 2 - 5, to: width / 2 + 5 },
+      duration: 2000 * appearance.animationSpeed,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
   }
 
   private createOre(width: number, _height: number) {
@@ -720,7 +1469,7 @@ class BattleScene extends Phaser.Scene {
   }
 
   private createActionButton(width: number, _height: number) {
-    this.actionButton = this.add.container(width / 2, 285);
+    this.actionButton = this.add.container(width / 2, 320);
 
     // 按钮阴影
     const btnShadow = this.add.graphics();
@@ -784,6 +1533,233 @@ class BattleScene extends Phaser.Scene {
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
+    });
+  }
+
+  private createSkillButtons(width: number, _height: number) {
+    this.skillButtons = this.add.container(width / 2, 360);
+
+    const skills = [
+      { id: 'power', name: '重击', icon: '💥', color: 0xf59e0b, key: 'Q', cooldown: 3000 },
+      { id: 'block', name: '格挡', icon: '🛡️', color: 0x3b82f6, key: 'W', cooldown: 5000 },
+      { id: 'heal', name: '治疗', icon: '💚', color: 0x22c55e, key: 'E', cooldown: 8000 },
+    ];
+
+    skills.forEach((skill, index) => {
+      const x = (index - 1) * 70;
+      const skillBtn = this.add.container(x, 0);
+
+      // 按钮背景
+      const bg = this.add.graphics();
+      bg.fillStyle(skill.color, 0.8);
+      bg.fillRoundedRect(-25, -18, 50, 36, 8);
+      bg.setName(`${skill.id}Bg`);
+      skillBtn.add(bg);
+
+      // 冷却遮罩
+      const cooldownMask = this.add.graphics();
+      cooldownMask.fillStyle(0x000000, 0.6);
+      cooldownMask.fillRoundedRect(-25, -18, 50, 36, 8);
+      cooldownMask.setVisible(false);
+      cooldownMask.setName(`${skill.id}Cooldown`);
+      skillBtn.add(cooldownMask);
+
+      // 图标
+      const icon = this.add.text(0, -4, skill.icon, {
+        fontSize: '18px',
+      }).setOrigin(0.5);
+      skillBtn.add(icon);
+
+      // 快捷键
+      const keyText = this.add.text(0, 12, skill.key, {
+        fontSize: '10px',
+        fontFamily: 'sans-serif',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 2,
+      }).setOrigin(0.5);
+      skillBtn.add(keyText);
+
+      // 交互
+      skillBtn.setSize(50, 36);
+      skillBtn.setInteractive({ useHandCursor: true });
+      skillBtn.setName(skill.id);
+
+      skillBtn.on('pointerdown', () => {
+        if (skill.id === 'power') this.usePowerAttack();
+        else if (skill.id === 'block') this.useBlock();
+        else if (skill.id === 'heal') this.useHeal();
+      });
+
+      skillBtn.on('pointerover', () => {
+        this.tweens.add({
+          targets: skillBtn,
+          scale: 1.1,
+          duration: 100,
+        });
+        // 显示技能提示
+        this.showSkillTooltip(skill.name, x);
+      });
+
+      skillBtn.on('pointerout', () => {
+        this.tweens.add({
+          targets: skillBtn,
+          scale: 1,
+          duration: 100,
+        });
+        this.hideSkillTooltip();
+      });
+
+      this.skillButtons.add(skillBtn);
+    });
+  }
+
+  private showSkillTooltip(name: string, x: number) {
+    // 移除旧的提示
+    this.hideSkillTooltip();
+    
+    const tooltip = this.add.text(this.cameras.main.width / 2 + x, 390, name, {
+      fontSize: '12px',
+      fontFamily: 'Microsoft YaHei, sans-serif',
+      color: '#ffffff',
+      backgroundColor: '#000000',
+      padding: { x: 6, y: 3 },
+    }).setOrigin(0.5);
+    tooltip.setName('skillTooltip');
+  }
+
+  private hideSkillTooltip() {
+    const tooltip = this.children.getByName('skillTooltip');
+    if (tooltip) tooltip.destroy();
+  }
+
+  private updateSkillCooldowns() {
+    const now = Date.now();
+    const skills = ['power', 'block', 'heal'];
+    
+    skills.forEach((skillId) => {
+      const skillBtn = this.skillButtons.getByName(skillId) as Phaser.GameObjects.Container;
+      if (!skillBtn) return;
+      
+      const cooldownMask = skillBtn.getByName(`${skillId}Cooldown`) as Phaser.GameObjects.Graphics;
+      if (!cooldownMask) return;
+      
+      const cooldownEnd = this.skillCooldowns[skillId] || 0;
+      const isOnCooldown = now < cooldownEnd;
+      
+      cooldownMask.setVisible(isOnCooldown);
+    });
+  }
+
+  private usePowerAttack() {
+    if (!this.monster || this.battlePhase === 'fighting' || this.isAttacking) return;
+    
+    const now = Date.now();
+    if (now < (this.skillCooldowns.power || 0)) {
+      this.addBattleMessage('⏳ 重击冷却中...');
+      return;
+    }
+    
+    this.skillCooldowns.power = now + 3000;
+    this.comboCount += 2; // 重击增加额外连击
+    this.addBattleMessage('💥 发动重击！');
+    
+    // 特殊攻击动画
+    this.playPowerAttackAnimation();
+    
+    this.time.delayedCall(200, () => {
+      if (this.onAttack) {
+        this.onAttack();
+        this.onAttack(); // 双倍伤害
+      }
+    });
+  }
+
+  private useBlock() {
+    if (!this.monster || this.isBlocking) return;
+    
+    const now = Date.now();
+    if (now < (this.skillCooldowns.block || 0)) {
+      this.addBattleMessage('⏳ 格挡冷却中...');
+      return;
+    }
+    
+    this.skillCooldowns.block = now + 5000;
+    this.isBlocking = true;
+    this.addBattleMessage('🛡️ 举起盾牌格挡！');
+    
+    // 格挡动画
+    this.playBlockAnimation();
+    
+    // 格挡持续2秒
+    this.time.delayedCall(2000, () => {
+      this.isBlocking = false;
+      this.addBattleMessage('盾牌放下');
+    });
+  }
+
+  private useHeal() {
+    const now = Date.now();
+    if (now < (this.skillCooldowns.heal || 0)) {
+      this.addBattleMessage('⏳ 治疗冷却中...');
+      return;
+    }
+    
+    this.skillCooldowns.heal = now + 8000;
+    this.addBattleMessage('💚 使用治疗！');
+    
+    // 治疗动画
+    this.playHealAnimation();
+    
+    // 治疗效果由外部处理，这里只是视觉效果
+    this.healEmitter.setPosition(this.playerSprite.x, this.playerSprite.y - 20);
+    this.healEmitter.explode(15);
+  }
+
+  private createBattleLog(width: number, _height: number) {
+    this.battleLog = this.add.container(width - 10, 130);
+    
+    // 背景
+    const logBg = this.add.graphics();
+    logBg.fillStyle(0x000000, 0.5);
+    logBg.fillRoundedRect(-120, -60, 120, 120, 6);
+    this.battleLog.add(logBg);
+    
+    // 标题
+    const title = this.add.text(-60, -50, '战斗日志', {
+      fontSize: '10px',
+      fontFamily: 'Microsoft YaHei, sans-serif',
+      color: '#888888',
+    }).setOrigin(0.5);
+    this.battleLog.add(title);
+  }
+
+  private addBattleMessage(message: string) {
+    this.battleMessages.unshift(message);
+    if (this.battleMessages.length > 5) {
+      this.battleMessages.pop();
+    }
+    this.updateBattleLog();
+  }
+
+  private updateBattleLog() {
+    // 移除旧消息
+    this.battleLog.each((child: Phaser.GameObjects.GameObject) => {
+      if (child.name?.startsWith('msg')) {
+        child.destroy();
+      }
+    });
+
+    // 添加新消息
+    this.battleMessages.forEach((msg, index) => {
+      const text = this.add.text(-115, -35 + index * 18, msg, {
+        fontSize: '9px',
+        fontFamily: 'Microsoft YaHei, sans-serif',
+        color: index === 0 ? '#ffffff' : '#888888',
+        wordWrap: { width: 110 },
+      });
+      text.setName(`msg${index}`);
+      this.battleLog.add(text);
     });
   }
 
@@ -1085,69 +2061,9 @@ class BattleScene extends Phaser.Scene {
   private updateMonsterAppearance() {
     if (!this.monster) return;
 
-    const monsterBody = this.monsterSprite.getByName('monsterBody') as Phaser.GameObjects.Graphics;
-    const leftEye = this.monsterSprite.getByName('leftEye') as Phaser.GameObjects.Ellipse;
-    const rightEye = this.monsterSprite.getByName('rightEye') as Phaser.GameObjects.Ellipse;
-
-    if (!monsterBody) return;
-
-    // 根据怪物名称选择颜色和形状
-    let bodyColor = 0x4caf50;
-    let eyeColor = 0xffffff;
-    let bodySize = 80;
-
-    const name = this.monster.name;
-    if (name.includes('蝙蝠')) {
-      bodyColor = 0x5d4037;
-      eyeColor = 0xff5722;
-      bodySize = 70;
-    } else if (name.includes('蜘蛛') || name.includes('蝎子')) {
-      bodyColor = 0x37474f;
-      eyeColor = 0xf44336;
-      bodySize = 75;
-    } else if (name.includes('地精') || name.includes('蜥蜴')) {
-      bodyColor = 0x8bc34a;
-      bodySize = 75;
-    } else if (name.includes('骷髅') || name.includes('亡灵')) {
-      bodyColor = 0xeceff1;
-      eyeColor = 0xf44336;
-      bodySize = 70;
-    } else if (name.includes('巨人') || name.includes('魔像') || name.includes('石像')) {
-      bodyColor = 0x607d8b;
-      eyeColor = 0x03a9f4;
-      bodySize = 95;
-    } else if (name.includes('龙') || name.includes('熔岩') || name.includes('岩浆')) {
-      bodyColor = 0xd32f2f;
-      eyeColor = 0xffeb3b;
-      bodySize = 90;
-    } else if (name.includes('领主') || name.includes('虚空') || name.includes('暗影')) {
-      bodyColor = 0x4a148c;
-      eyeColor = 0xff1744;
-      bodySize = 100;
-    } else if (name.includes('狼')) {
-      bodyColor = 0x424242;
-      eyeColor = 0xffeb3b;
-      bodySize = 75;
-    } else if (name.includes('虫') || name.includes('老鼠')) {
-      bodyColor = 0x6d4c41;
-      bodySize = 60;
-    } else if (name.includes('泰坦') || name.includes('矿王')) {
-      bodyColor = 0xffd700;
-      eyeColor = 0xff1744;
-      bodySize = 100;
-    }
-
-    // 绘制怪物身体
-    monsterBody.clear();
-    monsterBody.fillStyle(bodyColor);
-    monsterBody.fillEllipse(0, 0, bodySize, bodySize);
-    // 高光
-    monsterBody.fillStyle(0xffffff, 0.15);
-    monsterBody.fillEllipse(-bodySize * 0.15, -bodySize * 0.15, bodySize * 0.4, bodySize * 0.3);
-
-    // 更新眼睛颜色
-    if (leftEye) leftEye.setFillStyle(eyeColor);
-    if (rightEye) rightEye.setFillStyle(eyeColor);
+    const appearance = this.getMonsterAppearance(this.monster.name);
+    this.currentMonsterAppearance = appearance;
+    this.drawDetailedMonster(appearance);
   }
 
   private updateVisibility() {
@@ -1155,12 +2071,14 @@ class BattleScene extends Phaser.Scene {
     this.monsterSprite.setVisible(false);
     this.oreSprite.setVisible(false);
     this.actionButton.setVisible(false);
+    this.skillButtons.setVisible(false);
     this.defeatOverlay.setVisible(false);
     this.idleContainer.setVisible(false);
     this.monsterHpBar.setVisible(false);
     this.monsterNameText.setVisible(false);
     this.monsterHpText.setVisible(false);
     this.monsterStatsText.setVisible(false);
+    this.battleLog.setVisible(false);
 
     if (this.battlePhase === 'defeat') {
       this.defeatOverlay.setVisible(true);
@@ -1168,10 +2086,12 @@ class BattleScene extends Phaser.Scene {
     } else if (this.monster) {
       this.monsterSprite.setVisible(true);
       this.actionButton.setVisible(true);
+      this.skillButtons.setVisible(true);
       this.monsterHpBar.setVisible(true);
       this.monsterNameText.setVisible(true);
       this.monsterHpText.setVisible(true);
       this.monsterStatsText.setVisible(true);
+      this.battleLog.setVisible(true);
       this.updateActionButton('attack');
       this.updateMonsterAppearance();
       this.updateMonsterHpBar();
@@ -1207,15 +2127,34 @@ class BattleScene extends Phaser.Scene {
   }
 
   private playAttackAnimation() {
-    // 玩家冲刺攻击
-    const originalY = this.playerSprite.y;
-    const originalX = this.playerSprite.x;
+    // 如果正在动画中，不再触发新动画
+    if (this.isAttacking) return;
+    
+    // 停止所有玩家相关的动画
+    this.tweens.killTweensOf(this.playerSprite);
+    this.tweens.killTweensOf(this.playerLegs);
+    this.tweens.killTweensOf(this.playerSword);
+    
+    // 重置到原始位置
+    this.playerSprite.x = this.playerOriginalX;
+    this.playerSprite.y = this.playerOriginalY;
+    this.playerSprite.setScale(1);
+    
+    // 腿部动画
+    this.tweens.add({
+      targets: this.playerLegs,
+      angle: 15,
+      duration: 80,
+      yoyo: true,
+      onComplete: () => {
+        this.playerLegs.angle = 0;
+      },
+    });
 
     // 向前冲刺
     this.tweens.add({
       targets: this.playerSprite,
-      y: originalY - 50,
-      x: originalX,
+      y: this.playerOriginalY - 50,
       duration: 100,
       ease: 'Power2',
       onComplete: () => {
@@ -1243,7 +2182,8 @@ class BattleScene extends Phaser.Scene {
         // 返回原位
         this.tweens.add({
           targets: this.playerSprite,
-          y: originalY,
+          x: this.playerOriginalX,
+          y: this.playerOriginalY,
           duration: 150,
           ease: 'Power2',
           delay: 100,
@@ -1258,19 +2198,164 @@ class BattleScene extends Phaser.Scene {
     this.cameras.main.flash(50, 255, 255, 255, false);
   }
 
+  private playPowerAttackAnimation() {
+    // 如果正在动画中，不再触发
+    if (this.isAttacking) return;
+    this.isAttacking = true;
+    
+    // 停止所有玩家相关的动画
+    this.tweens.killTweensOf(this.playerSprite);
+    this.tweens.killTweensOf(this.playerSword);
+    
+    // 重置到原始位置
+    this.playerSprite.x = this.playerOriginalX;
+    this.playerSprite.y = this.playerOriginalY;
+    this.playerSprite.setScale(1);
+
+    // 蓄力效果
+    this.tweens.add({
+      targets: this.playerSprite,
+      scale: 1.15,
+      duration: 150,
+      onComplete: () => {
+        // 跳跃攻击
+        this.tweens.add({
+          targets: this.playerSprite,
+          y: this.playerOriginalY - 80,
+          duration: 150,
+          ease: 'Power2',
+          onComplete: () => {
+            // 下劈
+            this.tweens.add({
+              targets: this.playerSword,
+              angle: 90,
+              duration: 100,
+              ease: 'Power4',
+            });
+
+            // 落地
+            this.tweens.add({
+              targets: this.playerSprite,
+              x: this.playerOriginalX,
+              y: this.playerOriginalY,
+              scale: 1,
+              duration: 100,
+              ease: 'Power4',
+              onComplete: () => {
+                // 冲击波效果
+                this.sparkEmitter.setPosition(this.playerSprite.x, this.playerSprite.y);
+                this.sparkEmitter.explode(30);
+                
+                this.slashEmitter.setPosition(this.monsterSprite.x, this.monsterSprite.y);
+                this.slashEmitter.explode(10);
+
+                // 恢复剑位置
+                this.tweens.add({
+                  targets: this.playerSword,
+                  angle: -25,
+                  duration: 300,
+                });
+
+                this.isAttacking = false;
+                
+                // 恢复待机动画
+                this.restoreIdleAnimations();
+              },
+            });
+          },
+        });
+      },
+    });
+
+    // 强烈屏幕震动
+    this.time.delayedCall(300, () => {
+      this.cameras.main.shake(200, 0.02);
+      this.cameras.main.flash(100, 255, 200, 0, false);
+    });
+  }
+
+  private playBlockAnimation() {
+    // 盾牌举起动画
+    this.tweens.add({
+      targets: this.playerShield,
+      x: -10,
+      y: -20,
+      scale: 1.3,
+      duration: 150,
+      ease: 'Power2',
+    });
+
+    // 盾牌光效
+    this.shieldEmitter.setPosition(this.playerSprite.x - 20, this.playerSprite.y - 20);
+    this.shieldEmitter.explode(10);
+
+    // 2秒后放下
+    this.time.delayedCall(2000, () => {
+      this.tweens.add({
+        targets: this.playerShield,
+        x: -32,
+        y: 0,
+        scale: 1,
+        duration: 200,
+      });
+    });
+  }
+
+  private playHealAnimation() {
+    // 玩家发光
+    this.tweens.add({
+      targets: this.playerSprite,
+      alpha: 0.7,
+      duration: 100,
+      yoyo: true,
+      repeat: 3,
+    });
+
+    // 绿色光环
+    const healRing = this.add.circle(this.playerSprite.x, this.playerSprite.y, 10, 0x22c55e, 0.5);
+    this.tweens.add({
+      targets: healRing,
+      scale: 5,
+      alpha: 0,
+      duration: 800,
+      onComplete: () => healRing.destroy(),
+    });
+
+    // 显示治疗数字
+    const healText = this.add.text(this.playerSprite.x, this.playerSprite.y - 40, '+10', {
+      fontSize: '24px',
+      fontFamily: 'sans-serif',
+      color: '#22c55e',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setOrigin(0.5);
+
+    this.tweens.add({
+      targets: healText,
+      y: this.playerSprite.y - 80,
+      alpha: 0,
+      duration: 1000,
+      onComplete: () => healText.destroy(),
+    });
+  }
+
   private playMonsterHitAnimation() {
     const width = this.cameras.main.width;
+    const monsterOriginalX = width / 2;
+
+    // 停止怪物位置相关的动画，但保留呼吸等动画
+    // 注意：不要停止所有动画，只停止位置相关的
 
     // 怪物震动 - 更剧烈
     this.tweens.add({
       targets: this.monsterSprite,
-      x: { from: width / 2 - 15, to: width / 2 + 15 },
+      x: { from: monsterOriginalX - 15, to: monsterOriginalX + 15 },
       duration: 40,
       yoyo: true,
       repeat: 4,
       ease: 'Power1',
       onComplete: () => {
-        this.monsterSprite.x = width / 2;
+        this.monsterSprite.x = monsterOriginalX;
       },
     });
 
@@ -1281,6 +2366,21 @@ class BattleScene extends Phaser.Scene {
       duration: 80,
       yoyo: true,
       ease: 'Power2',
+      onComplete: () => {
+        this.monsterSprite.setScale(1);
+      },
+    });
+
+    // 怪物身体变红
+    this.tweens.add({
+      targets: this.monsterBody,
+      alpha: 0.5,
+      duration: 60,
+      yoyo: true,
+      repeat: 2,
+      onComplete: () => {
+        this.monsterBody.setAlpha(1);
+      },
     });
 
     // 血液粒子
@@ -1294,27 +2394,72 @@ class BattleScene extends Phaser.Scene {
       duration: 60,
       yoyo: true,
       repeat: 3,
+      onComplete: () => {
+        this.monsterSprite.setAlpha(1);
+      },
     });
 
     // 魔法粒子（暴击效果）
     if (this.comboCount >= 3) {
       this.magicEmitter.setPosition(this.monsterSprite.x, this.monsterSprite.y);
       this.magicEmitter.explode(15);
+      this.addBattleMessage(`🔥 ${this.comboCount}连击！`);
     }
   }
 
   private playPlayerHitAnimation() {
-    const width = this.cameras.main.width;
+    // 检查是否格挡
+    if (this.isBlocking) {
+      // 格挡成功效果
+      this.shieldEmitter.setPosition(this.playerSprite.x - 20, this.playerSprite.y);
+      this.shieldEmitter.explode(15);
+      
+      // 盾牌震动
+      this.tweens.add({
+        targets: this.playerShield,
+        x: { from: -15, to: -5 },
+        duration: 30,
+        yoyo: true,
+        repeat: 3,
+        onComplete: () => {
+          this.playerShield.x = -32;
+        },
+      });
 
-    // 玩家震动
+      // 减少伤害的视觉反馈
+      this.addBattleMessage('🛡️ 格挡成功！');
+      
+      // 轻微屏幕震动
+      this.cameras.main.shake(80, 0.005);
+      return;
+    }
+
+    // 停止玩家移动动画以防冲突
+    this.tweens.killTweensOf(this.playerSprite);
+
+    // 玩家震动 - 使用固定的原始位置
     this.tweens.add({
       targets: this.playerSprite,
-      x: { from: width / 2 - 12, to: width / 2 + 12 },
+      x: { from: this.playerOriginalX - 12, to: this.playerOriginalX + 12 },
       duration: 50,
       yoyo: true,
       repeat: 3,
       onComplete: () => {
-        this.playerSprite.x = width / 2;
+        this.playerSprite.x = this.playerOriginalX;
+      },
+    });
+
+    // 玩家后退并恢复
+    this.tweens.add({
+      targets: this.playerSprite,
+      y: this.playerOriginalY + 10,
+      duration: 100,
+      onComplete: () => {
+        this.tweens.add({
+          targets: this.playerSprite,
+          y: this.playerOriginalY,
+          duration: 100,
+        });
       },
     });
 
@@ -1327,20 +2472,32 @@ class BattleScene extends Phaser.Scene {
 
     // 屏幕震动
     this.cameras.main.shake(150, 0.01);
+
+    this.addBattleMessage('💔 受到攻击！');
   }
 
   private playMiningEffect() {
     const width = this.cameras.main.width;
+    const oreOriginalX = width / 2;
+    const oreOriginalY = 175;
+
+    // 停止矿石相关动画
+    this.tweens.killTweensOf(this.oreSprite);
+    
+    // 重置矿石位置
+    this.oreSprite.x = oreOriginalX;
+    this.oreSprite.y = oreOriginalY;
+    this.oreSprite.setScale(1);
 
     // 矿石震动 - 更剧烈
     this.tweens.add({
       targets: this.oreSprite,
-      x: { from: width / 2 - 8, to: width / 2 + 8 },
+      x: { from: oreOriginalX - 8, to: oreOriginalX + 8 },
       duration: 25,
       yoyo: true,
       repeat: 8,
       onComplete: () => {
-        this.oreSprite.x = width / 2;
+        this.oreSprite.x = oreOriginalX;
       },
     });
 
@@ -1373,21 +2530,23 @@ class BattleScene extends Phaser.Scene {
 
   private showDamageNumber(x: number, y: number, damage: number, isPlayerDamage: boolean) {
     const color = isPlayerDamage ? '#ef4444' : '#fbbf24';
-    const prefix = isPlayerDamage ? '-' : '-';
+    const prefix = '-';
+    const isCrit = this.comboCount >= 5 && !isPlayerDamage;
+    const fontSize = isCrit ? '36px' : (this.comboCount >= 3 && !isPlayerDamage ? '30px' : '24px');
 
     // 主伤害数字
     const damageText = this.add.text(x + Phaser.Math.Between(-25, 25), y, `${prefix}${damage}`, {
-      fontSize: this.comboCount >= 3 && !isPlayerDamage ? '32px' : '26px',
+      fontSize: fontSize,
       fontFamily: 'sans-serif',
-      color: color,
+      color: isCrit ? '#ff6600' : color,
       stroke: '#000000',
       strokeThickness: 4,
     }).setOrigin(0.5);
 
     // 暴击文字
-    if (this.comboCount >= 5 && !isPlayerDamage) {
-      const critText = this.add.text(x, y - 30, '暴击!', {
-        fontSize: '18px',
+    if (isCrit) {
+      const critText = this.add.text(x, y - 35, '💥 暴击!', {
+        fontSize: '20px',
         fontFamily: 'Microsoft YaHei, sans-serif',
         color: '#ff6600',
         stroke: '#000000',
@@ -1396,26 +2555,29 @@ class BattleScene extends Phaser.Scene {
 
       this.tweens.add({
         targets: critText,
-        y: y - 80,
+        y: y - 90,
         alpha: 0,
         scale: 1.5,
         duration: 1000,
         ease: 'Power2',
         onComplete: () => critText.destroy(),
       });
+
+      // 暴击屏幕效果
+      this.cameras.main.flash(80, 255, 150, 0, false);
     }
 
     // 弹出动画
-    damageText.setScale(0.5);
+    damageText.setScale(0.3);
     this.tweens.add({
       targets: damageText,
-      scale: 1.2,
+      scale: isCrit ? 1.4 : 1.2,
       duration: 100,
       ease: 'Back.easeOut',
       onComplete: () => {
         this.tweens.add({
           targets: damageText,
-          y: y - 60,
+          y: y - 70,
           alpha: 0,
           scale: 0.8,
           duration: 700,
@@ -1424,12 +2586,23 @@ class BattleScene extends Phaser.Scene {
         });
       },
     });
+
+    // 添加战斗日志
+    if (!isPlayerDamage) {
+      this.addBattleMessage(`⚔️ 造成 ${damage} 点伤害`);
+    }
   }
 
   // 显示获得物品
   private showLootText(text: string) {
     const width = this.cameras.main.width;
-    const lootText = this.add.text(width / 2, 320, text, {
+    
+    // 背景
+    const lootBg = this.add.graphics();
+    lootBg.fillStyle(0x000000, 0.7);
+    lootBg.fillRoundedRect(width / 2 - 80, 270, 160, 40, 8);
+    
+    const lootText = this.add.text(width / 2, 290, text, {
       fontSize: '16px',
       fontFamily: 'Microsoft YaHei, sans-serif',
       color: '#22c55e',
@@ -1437,14 +2610,81 @@ class BattleScene extends Phaser.Scene {
       strokeThickness: 3,
     }).setOrigin(0.5);
 
+    // 星星效果
+    for (let i = 0; i < 5; i++) {
+      const star = this.add.text(
+        width / 2 + Phaser.Math.Between(-60, 60),
+        290 + Phaser.Math.Between(-15, 15),
+        '✨',
+        { fontSize: '16px' }
+      ).setOrigin(0.5);
+      
+      this.tweens.add({
+        targets: star,
+        y: star.y - 40,
+        alpha: 0,
+        scale: 0.5,
+        duration: 800,
+        delay: i * 100,
+        onComplete: () => star.destroy(),
+      });
+    }
+
     this.tweens.add({
-      targets: lootText,
-      y: 280,
+      targets: [lootBg, lootText],
+      y: '-=30',
       alpha: 0,
       duration: 1500,
+      delay: 500,
       ease: 'Power2',
-      onComplete: () => lootText.destroy(),
+      onComplete: () => {
+        lootBg.destroy();
+        lootText.destroy();
+      },
     });
+
+    this.addBattleMessage('🎉 ' + text);
+  }
+
+  // 显示经验获得
+  private showExpGain(exp: number, gold: number) {
+    const width = this.cameras.main.width;
+    
+    if (exp > 0) {
+      const expText = this.add.text(width / 2 - 40, 240, `+${exp} EXP`, {
+        fontSize: '18px',
+        fontFamily: 'sans-serif',
+        color: '#a855f7',
+        stroke: '#000000',
+        strokeThickness: 3,
+      }).setOrigin(0.5);
+
+      this.tweens.add({
+        targets: expText,
+        y: 200,
+        alpha: 0,
+        duration: 1500,
+        onComplete: () => expText.destroy(),
+      });
+    }
+
+    if (gold > 0) {
+      const goldText = this.add.text(width / 2 + 40, 240, `+${gold} 💰`, {
+        fontSize: '18px',
+        fontFamily: 'sans-serif',
+        color: '#fbbf24',
+        stroke: '#000000',
+        strokeThickness: 3,
+      }).setOrigin(0.5);
+
+      this.tweens.add({
+        targets: goldText,
+        y: 200,
+        alpha: 0,
+        duration: 1500,
+        onComplete: () => goldText.destroy(),
+      });
+    }
   }
 
   // 外部调用更新方法
@@ -1465,7 +2705,9 @@ class BattleScene extends Phaser.Scene {
     // 检测玩家伤害
     if (data.playerHp < this.lastPlayerHp) {
       const damage = this.lastPlayerHp - data.playerHp;
-      this.showDamageNumber(this.playerSprite.x, this.playerSprite.y - 40, damage, true);
+      // 如果在格挡，减少显示的伤害
+      const displayDamage = this.isBlocking ? Math.floor(damage * 0.5) : damage;
+      this.showDamageNumber(this.playerSprite.x, this.playerSprite.y - 40, displayDamage, true);
       this.playPlayerHitAnimation();
     }
 
@@ -1473,8 +2715,23 @@ class BattleScene extends Phaser.Scene {
     if (this.monster && !data.monster && data.canMine) {
       this.showLootText('✨ 怪物已击败！');
       this.goldEmitter.setPosition(this.monsterSprite.x, this.monsterSprite.y);
-      this.goldEmitter.explode(20);
+      this.goldEmitter.explode(25);
+      
+      // 显示经验和金币
+      if (this.monster.expReward || this.monster.goldReward) {
+        this.showExpGain(this.monster.expReward, this.monster.goldReward);
+      }
+      
+      // 胜利动画
+      this.playVictoryAnimation();
+      
       this.comboCount = 0;
+    }
+
+    // 检测新怪物出现
+    if (!this.monster && data.monster) {
+      this.addBattleMessage(`⚠️ ${data.monster.name} 出现了！`);
+      this.playMonsterAppearAnimation();
     }
 
     this.monster = data.monster;
@@ -1490,6 +2747,105 @@ class BattleScene extends Phaser.Scene {
     if (this.monster) {
       this.updateMonsterHpBar();
     }
+  }
+
+  private playVictoryAnimation() {
+    // 停止玩家相关动画
+    this.tweens.killTweensOf(this.playerSprite);
+    this.tweens.killTweensOf(this.playerSword);
+    
+    // 确保玩家在正确位置
+    this.playerSprite.x = this.playerOriginalX;
+    this.playerSprite.y = this.playerOriginalY;
+    this.playerSprite.setScale(1);
+    
+    // 玩家胜利姿势
+    this.tweens.add({
+      targets: this.playerSword,
+      angle: -90,
+      y: -20,
+      duration: 300,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: this.playerSword,
+          angle: -25,
+          y: -8,
+          duration: 500,
+          delay: 500,
+          onComplete: () => {
+            this.restoreIdleAnimations();
+          },
+        });
+      },
+    });
+
+    // 玩家跳跃
+    this.tweens.add({
+      targets: this.playerSprite,
+      y: this.playerOriginalY - 20,
+      duration: 200,
+      yoyo: true,
+      ease: 'Power2',
+      onComplete: () => {
+        this.playerSprite.y = this.playerOriginalY;
+      },
+    });
+  }
+
+  // 恢复待机动画
+  private restoreIdleAnimations() {
+    // 确保玩家在正确位置
+    this.playerSprite.x = this.playerOriginalX;
+    this.playerSprite.y = this.playerOriginalY;
+    this.playerSprite.setScale(1);
+    
+    // 重新添加呼吸动画
+    this.tweens.add({
+      targets: this.playerSprite,
+      scaleY: { from: 1, to: 1.02 },
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // 剑的轻微摆动
+    this.tweens.add({
+      targets: this.playerSword,
+      angle: { from: -28, to: -22 },
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // 盾牌轻微移动
+    this.tweens.add({
+      targets: this.playerShield,
+      y: { from: 0, to: 2 },
+      duration: 1300,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  private playMonsterAppearAnimation() {
+    // 怪物出现动画
+    this.monsterSprite.setScale(0);
+    this.monsterSprite.setAlpha(0);
+    
+    this.tweens.add({
+      targets: this.monsterSprite,
+      scale: 1,
+      alpha: 1,
+      duration: 400,
+      ease: 'Back.easeOut',
+    });
+
+    // 警告效果
+    this.cameras.main.flash(100, 255, 100, 0, false);
   }
 }
 
