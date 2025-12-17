@@ -17,26 +17,26 @@ interface DeliveryDialogProps {
   equipments: Equipment[];
 }
 
-// 品质边框颜色
+// 品质边框颜色 - 深色主题
 const qualityBorderColors: Record<Quality, string> = {
-  poor: 'border-gray-400',
-  common: 'border-gray-400',
-  uncommon: 'border-green-500',
+  poor: 'border-stone-500',
+  common: 'border-stone-400',
+  uncommon: 'border-emerald-500',
   rare: 'border-blue-500',
   epic: 'border-purple-500',
   legendary: 'border-amber-500',
   mythic: 'border-red-500',
 };
 
-// 品质图标背景
+// 品质图标背景 - 深色主题
 const qualityIconBg: Record<Quality, string> = {
-  poor: 'bg-gray-400 border-gray-500',
-  common: 'bg-quality-common border-gray-400',
-  uncommon: 'bg-green-500 border-green-600',
-  rare: 'bg-blue-500 border-blue-600',
-  epic: 'bg-purple-500 border-purple-600',
-  legendary: 'bg-amber-500 border-amber-600',
-  mythic: 'bg-red-500 border-red-600',
+  poor: 'bg-stone-500 border-stone-400',
+  common: 'bg-stone-600 border-stone-500',
+  uncommon: 'bg-emerald-600 border-emerald-500',
+  rare: 'bg-blue-600 border-blue-500',
+  epic: 'bg-purple-600 border-purple-500',
+  legendary: 'bg-amber-500 border-amber-400',
+  mythic: 'bg-red-600 border-red-500',
 };
 
 // 品质分数加成
@@ -143,24 +143,24 @@ export function DeliveryDialog({ open, onClose, order, equipments }: DeliveryDia
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="rounded-2xl bg-forge-cream border-3 border-forge-brown shadow-xl max-w-2xl">
+      <DialogContent className="rounded-2xl !bg-gradient-to-b !from-stone-700 !to-stone-800 border-3 border-pixel-border shadow-[5px_5px_0_0_rgba(28,25,23,0.5)] max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-lg text-forge-dark">
+          <DialogTitle className="text-lg text-foreground pixel-text">
             选择交付物品
           </DialogTitle>
         </DialogHeader>
 
         {/* Order Requirements */}
-        <div className="bg-forge-light rounded-xl p-4 border-3 border-forge-brown/50 mb-4">
-          <p className="text-xs text-forge-dark mb-2">顾客需求:</p>
-          <p className="text-[10px] text-forge-brown">{order.requirement}</p>
+        <div className="bg-stone-800/60 rounded-xl p-4 border-3 border-stone-600/50 mb-4">
+          <p className="text-xs text-foreground mb-2">顾客需求:</p>
+          <p className="text-[10px] text-muted-foreground">{order.requirement}</p>
           {order.minAttack && (
-            <Badge className="mt-2 mr-2 bg-pixel-pink border-2 border-red-400 text-red-600 text-[10px] rounded-lg">
+            <Badge className="mt-2 mr-2 bg-red-900/50 border-2 border-red-500 text-red-300 text-[10px] rounded-lg">
               攻击力 ≥ {order.minAttack}
             </Badge>
           )}
           {order.minDefense && (
-            <Badge className="mt-2 bg-pixel-sky border-2 border-blue-400 text-blue-600 text-[10px] rounded-lg">
+            <Badge className="mt-2 bg-blue-900/50 border-2 border-blue-500 text-blue-300 text-[10px] rounded-lg">
               防御力 ≥ {order.minDefense}
             </Badge>
           )}
@@ -170,7 +170,7 @@ export function DeliveryDialog({ open, onClose, order, equipments }: DeliveryDia
         <ScrollArea className="h-[300px]">
           <div className="grid grid-cols-2 gap-3 pr-4">
             {equipments.length === 0 ? (
-              <div className="col-span-2 text-center py-8 text-forge-brown/50 text-xs">
+              <div className="col-span-2 text-center py-8 text-muted-foreground text-xs">
                 仓库中没有装备，去锻造一些吧！
               </div>
             ) : (
@@ -183,10 +183,11 @@ export function DeliveryDialog({ open, onClose, order, equipments }: DeliveryDia
                     key={item.id}
                     onClick={() => setSelectedItem(item)}
                     className={cn(
-                      'p-3 rounded-xl border-3 transition-all text-left shadow-sm',
+                      'p-3 rounded-xl border-3 transition-all text-left',
+                      'bg-gradient-to-b from-stone-700/80 to-stone-800/90',
                       isSelected
-                        ? 'border-forge-orange bg-forge-peach shadow-md scale-[1.02]'
-                        : 'border-forge-brown/50 bg-forge-light hover:bg-forge-cream',
+                        ? 'border-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.4)] scale-[1.02]'
+                        : 'border-stone-600 hover:border-stone-500',
                       qualityBorderColors[item.quality]
                     )}
                   >
@@ -205,16 +206,18 @@ export function DeliveryDialog({ open, onClose, order, equipments }: DeliveryDia
                         />
                       </div>
                       <div className="flex-1">
-                        <p className="text-xs text-forge-dark">{item.name}</p>
+                        <p className="text-xs text-foreground">{item.name}</p>
                         <div className="flex gap-2 text-[10px]">
-                          {item.attack && <span className="text-red-500">攻+{item.attack}</span>}
-                          {item.defense && <span className="text-blue-500">防+{item.defense}</span>}
+                          {item.attack && <span className="text-red-400">攻+{item.attack}</span>}
+                          {item.defense && <span className="text-blue-400">防+{item.defense}</span>}
                         </div>
                       </div>
                       <Badge
                         className={cn(
                           'border-2 text-[10px] rounded-lg',
-                          matches ? 'bg-pixel-mint border-green-400 text-green-700' : 'bg-pixel-pink border-red-400 text-red-600'
+                          matches 
+                            ? 'bg-emerald-900/50 border-emerald-500 text-emerald-300' 
+                            : 'bg-red-900/50 border-red-500 text-red-300'
                         )}
                       >
                         {score}%
@@ -232,7 +235,13 @@ export function DeliveryDialog({ open, onClose, order, equipments }: DeliveryDia
           <Button
             onClick={handleDeliver}
             disabled={!selectedItem || isHaggling}
-            className="flex-1 h-12 rounded-xl border-3 border-forge-brown bg-forge-peach hover:bg-forge-orange text-forge-dark hover:text-white shadow-md transition-all text-xs"
+            className={cn(
+              'flex-1 h-12 rounded-xl border-3 pixel-btn text-xs',
+              'bg-gradient-to-b from-amber-500 to-amber-600',
+              'hover:from-amber-400 hover:to-amber-500',
+              'text-amber-950 font-bold',
+              'shadow-[3px_3px_0_0_rgba(0,0,0,0.4)]'
+            )}
           >
             <GiTwoCoins className="mr-2 text-xl" />
             交付 ({order.reward} 金币)
@@ -241,7 +250,13 @@ export function DeliveryDialog({ open, onClose, order, equipments }: DeliveryDia
             onClick={handleHaggle}
             disabled={!selectedItem || isHaggling}
             variant="outline"
-            className="flex-1 h-12 rounded-xl border-3 border-forge-brown bg-forge-light hover:bg-pixel-lemon text-forge-dark text-xs"
+            className={cn(
+              'flex-1 h-12 rounded-xl border-3 pixel-btn text-xs',
+              'bg-gradient-to-b from-stone-600 to-stone-700',
+              'hover:from-stone-500 hover:to-stone-600',
+              'text-foreground border-stone-500',
+              'shadow-[3px_3px_0_0_rgba(0,0,0,0.4)]'
+            )}
           >
             <GiDiceSixFacesSix className={cn('mr-2 text-xl', isHaggling && 'animate-spin')} />
             {isHaggling ? '讨价中...' : '讨价还价'}

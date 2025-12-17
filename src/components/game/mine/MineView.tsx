@@ -111,16 +111,16 @@ export function MineView() {
             </div>
           </div>
         </DialogTrigger>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md !bg-gradient-to-b !from-stone-700 !to-stone-800 border-3 border-pixel-border shadow-[5px_5px_0_0_rgba(28,25,23,0.5)]">
           <DialogHeader>
-            <DialogTitle>选择{label}</DialogTitle>
+            <DialogTitle className="text-foreground pixel-text">选择{label}</DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-80">
             <div className="space-y-2">
               {equipment && (
                 <Button
                   variant="outline"
-                  className="w-full justify-start"
+                  className="w-full justify-start bg-stone-600/50 border-stone-500 hover:bg-stone-500 text-foreground"
                   onClick={() => {
                     unequipItem(slot);
                     setShowEquipSelect(null);
@@ -136,7 +136,8 @@ export function MineView() {
                   <div
                     key={item.id}
                     className={cn(
-                      'p-3 rounded-lg cursor-pointer transition-all hover:bg-muted',
+                      'p-3 rounded-lg cursor-pointer transition-all',
+                      'bg-stone-700/60 hover:bg-stone-600/80 border-2 border-stone-600',
                       qualityBgColors[item.quality]
                     )}
                     onClick={() => handleEquip(slot, item)}
@@ -147,9 +148,9 @@ export function MineView() {
                         <p className="text-xs text-muted-foreground">{equipmentTypeNames[item.type]}</p>
                       </div>
                       <div className="text-right text-sm">
-                        {item.attack ? <p>⚔️ +{item.attack}</p> : null}
-                        {item.defense ? <p>🛡️ +{item.defense}</p> : null}
-                        <p className="text-xs text-yellow-500">
+                        {item.attack ? <p className="text-red-400">⚔️ +{item.attack}</p> : null}
+                        {item.defense ? <p className="text-blue-400">🛡️ +{item.defense}</p> : null}
+                        <p className="text-xs text-amber-400">
                           耐久: {item.durability}/{item.maxDurability}
                         </p>
                       </div>
@@ -237,9 +238,9 @@ export function MineView() {
                     切换层级
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl !bg-gradient-to-b !from-stone-700 !to-stone-800 border-3 border-pixel-border shadow-[5px_5px_0_0_rgba(28,25,23,0.5)]">
                   <DialogHeader>
-                    <DialogTitle>选择矿场层级</DialogTitle>
+                    <DialogTitle className="text-foreground pixel-text">选择矿场层级</DialogTitle>
                   </DialogHeader>
                   <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto">
                     {mineLevels.map((level) => {
@@ -250,12 +251,13 @@ export function MineView() {
                         <div
                           key={level.level}
                           className={cn(
-                            'p-4 rounded-xl border-2 transition-all',
+                            'p-4 rounded-xl border-3 transition-all',
+                            'bg-gradient-to-b from-stone-700/80 to-stone-800/90',
                             isUnlocked
                               ? isCurrent
-                                ? 'border-primary bg-primary/10'
-                                : 'border-border hover:border-primary/50 cursor-pointer'
-                              : 'border-muted bg-muted/20 opacity-50 cursor-not-allowed'
+                                ? 'border-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
+                                : 'border-stone-600 hover:border-amber-500/50 cursor-pointer'
+                              : 'border-stone-700 bg-stone-800/50 opacity-50 cursor-not-allowed'
                           )}
                           onClick={() => {
                             if (isUnlocked) {
@@ -265,14 +267,17 @@ export function MineView() {
                           }}
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <h3 className="font-bold">{level.name}</h3>
-                            <Badge variant={isUnlocked ? 'default' : 'secondary'}>
+                            <h3 className="font-bold text-foreground">{level.name}</h3>
+                            <Badge 
+                              variant={isUnlocked ? 'default' : 'secondary'}
+                              className={isUnlocked ? 'bg-amber-500 text-amber-950' : 'bg-stone-600 text-stone-300'}
+                            >
                               Lv.{level.level}
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground mb-2">{level.description}</p>
                           <div className="flex items-center gap-2 text-xs">
-                            <span className={total >= level.requiredPower ? 'text-green-400' : 'text-red-400'}>
+                            <span className={total >= level.requiredPower ? 'text-emerald-400' : 'text-red-400'}>
                               💪 {level.requiredPower}
                             </span>
                             {!isUnlocked && <span className="text-muted-foreground">🔒 未解锁</span>}
